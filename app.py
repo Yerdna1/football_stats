@@ -1,3 +1,4 @@
+import os
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
@@ -161,7 +162,7 @@ class DashboardApp:
 
     def run(self, debug=True):
         # Run the Dash app
-        self.app.run_server(debug=debug)
+        self.app.run_server(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
 
 if __name__ == '__main__':
     # Instantiate the API and app
