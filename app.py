@@ -1,18 +1,14 @@
-from datetime import datetime
 import os
 import dash
 from dash import dcc, html
-from dash.dependencies import Input, Output
-import plotly.express as px
-import pandas as pd
 import logging
-import requests
 from api import FootballAPI
-from callbacks.form_analysis_callback import setup_form_analysis_callbacks
-from callbacks.league_stats_callback import setup_league_stats_callbacks
-from callbacks.next_fixtures_callback import setup_next_fixtures_callbacks
-from callbacks.team_analysis_callback import setup_team_analysis_callbacks
-from callbacks.winless_streaks_callback import setup_winless_streaks_callbacks
+from sport_callbacks import (
+    setup_winless_streaks_callbacks,
+    setup_team_analysis_callbacks,
+    setup_next_fixtures_callbacks,
+    setup_league_stats_callbacks,
+    setup_form_analysis_callbacks)
 from sport_layouts import (
     create_winless_streaks_tab,
     create_team_analysis_tab,
@@ -20,7 +16,6 @@ from sport_layouts import (
     create_league_stats_tab,
     create_form_analysis_tab
 )
-from sport_analyzers import WinlessStreakAnalyzer, TeamAnalyzer, FixtureAnalyzer, LeagueAnalyzer, FormAnalyzer
 from config import ALL_LEAGUES, API_KEY, BASE_URL, LEAGUE_NAMES
 
 # Set up logging
