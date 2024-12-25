@@ -1,7 +1,8 @@
+from datetime import datetime, timedelta
 import time
 import requests
 import logging
-
+from functools import lru_cache
 from config import ALL_LEAGUES, LEAGUE_NAMES
 from sport_analyzers.form_analyzer import FormAnalyzer
 
@@ -13,6 +14,19 @@ class FootballAPI:
         self.base_url = base_url
         self.headers = {'x-apisports-key': api_key}
         self.logger = logging.getLogger(__name__)
+        self.cache = {}
+        self.cache_duration = timedelta(minutes=15)  # Cache for 15 minutes
+        
+    def _get_from_cache(self, key):
+        if key in self.cache:
+            data, timestamp = self.cache[key]
+            if datetime.now() - timestamp < self.cache_duration:
+                return data
+            del self.cache[key]
+        return None
+
+    def _set_cache(self, key, data):
+        self.cache[key] = (data, datetime.now())
         
     def fetch_all_teams(api, league_names, matches_count=3):
         """
@@ -120,6 +134,11 @@ class FootballAPI:
 
         
     def fetch_standings(self, league_id):
+        cache_key = f'standings_{league_id}'
+        cached_data = self._get_from_cache(cache_key)
+        if cached_data:
+            return cached_data
+        
         url = f"{self.base_url}/standings"
         
         if league_id == ALL_LEAGUES:
@@ -143,7 +162,7 @@ class FootballAPI:
                         self.logger.warning(f"Failed to fetch standings for league {league_id}, status code: {response.status_code}")
                 except Exception as e:
                     self.logger.error(f"Error fetching standings for league {league_id}: {str(e)}")
-            
+            self._set_cache(cache_key, all_standings)
             return all_standings
         
         else:
@@ -155,6 +174,7 @@ class FootballAPI:
             try:
                 response = requests.get(url, headers=self.headers, params=params)
                 if response.status_code == 200:
+                    self._set_cache(cache_key, response.json())
                     return response.json()
                 else:
                     self.logger.warning(f"Failed to fetch standings for league {league_id}, status code: {response.status_code}")
@@ -190,14 +210,21 @@ class FootballAPI:
         except requests.exceptions.RequestException as e:
             self.logger.error(f"API request failed: {str(e)}")
             return None
-
+        
+    @lru_cache(maxsize=32)
     def fetch_fixtures(self, league_id, season='2024', team_id=None, fixture_id=None):
+        cache_key = f'fixtures_{league_id}_{team_id}_{fixture_id}'
+        cached_data = self._get_from_cache(cache_key)
+        if cached_data:
+            return cached_data
+    
         # If fixture_id is provided, fetch specific fixture
         if fixture_id is not None:
             url = f"{self.base_url}/fixtures"
             params = {'id': fixture_id}
             response = requests.get(url, headers=self.headers, params=params)
             if response.status_code == 200:
+                self._set_cache(cache_key, response.json().get('response', []))
                 return response.json().get('response', [])
             return []
 
@@ -214,6 +241,7 @@ class FootballAPI:
                     except Exception as e:
                         self.logger.error(f"Error fetching fixtures for league {lid}: {str(e)}")
                         continue
+            self._set_cache(cache_key, all_fixtures)
             return all_fixtures
         
         url = f"{self.base_url}/fixtures"
@@ -226,6 +254,7 @@ class FootballAPI:
             
         response = requests.get(url, headers=self.headers, params=params)
         if response.status_code == 200:
+            self._set_cache(cache_key, response.json().get('response', []))
             return response.json().get('response', [])
         return []
 
@@ -311,8 +340,14 @@ class FootballAPI:
         except Exception as e:
             logger.error(f"Error fetching player statistics: {str(e)}")
             return []
-
+        
+    @lru_cache(maxsize=128)
     def fetch_team_statistics(self, league_id, team_id, season='2024'):
+        cache_key = f'team_stats_{league_id}_{team_id}'
+        cached_data = self._get_from_cache(cache_key)
+        if cached_data:
+            return cached_data
+        
         """Fetch team statistics"""
         url = f"{self.base_url}/teams/statistics"
         params = {
@@ -327,11 +362,13 @@ class FootballAPI:
         if response.status_code == 200:
             data = response.json()
             logger.debug(f"Team stats response: {data}")
+            self._set_cache(cache_key, data.get('response', {}))
             return data.get('response', {})
         else:
             logger.error(f"Error fetching team stats. Status code: {response.status_code}")
             logger.error(f"Response: {response.text}")
             return {}
+        
     def fetch_match_odds(self, fixture_id):
         url = f"{self.base_url}/odds"
         params = {
@@ -363,4 +400,27 @@ class FootballAPI:
             return f"{float(odds_value):.2f}"
         except (ValueError, TypeError):
             return "N/A"
+        
+    def fetch_api_usage(self):
+        cache_key = 'api_usage'
+        cached_data = self._get_from_cache(cache_key)
+        if cached_data:
+            return cached_data
+        
+        url = f"{self.base_url}/status"
+        response = requests.get(url, headers=self.headers)
+        if response.status_code == 200:
+            data = response.json()
+            if isinstance(data['response'], list) and data['response']:
+                requests_info = data['response'][0].get('requests', {})
+                self._set_cache(cache_key, {
+                    'current': requests_info.get('current', 0),
+                    'limit_day': requests_info.get('limit_day', 0)
+                })
+                return {
+                    'current': requests_info.get('current', 0),
+                    'limit_day': requests_info.get('limit_day', 0)
+                }
+        
+        return {'current': 0, 'limit_day': 0}
     
