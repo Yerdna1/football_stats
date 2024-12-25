@@ -3,6 +3,7 @@ import requests
 import logging
 
 from config import ALL_LEAGUES, LEAGUE_NAMES
+from sport_analyzers.form_analyzer import FormAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -13,18 +14,154 @@ class FootballAPI:
         self.headers = {'x-apisports-key': api_key}
         self.logger = logging.getLogger(__name__)
         
+    def fetch_all_teams(api, league_names, matches_count=3):
+        """
+        Fetch all teams across all leagues by iterating through league IDs.
+        :param api: API object with methods to fetch standings and fixtures.
+        :param league_names: Dictionary of league IDs and names.
+        :param matches_count: Number of matches to analyze for form (optional).
+        :return: List of all teams with combined analysis.
+        """
+        all_teams = []
+
+        if league_names.get(ALL_LEAGUES):
+            standings = api.fetch_standings(ALL_LEAGUES)
+            
+            if not standings:
+                print(f"No standings available for ALL_LEAGUES.")
+                return []
+
+            # Iterate through each league's standings and fixtures
+            for league_id, league_standings in standings.items():
+                league_info = league_names.get(league_id)
+                if not league_info:
+                    print(f"No information available for league ID {league_id}")
+                    continue
+
+                standings_data = league_standings['response'][0]['league']['standings'][0]
+                fixtures = api.fetch_fixtures(league_id)
+
+                # Analyze each team's form and add to the combined list
+                for team in standings_data:
+                    team_id = team['team']['id']
+                    team_name = team['team']['name']
+                    actual_points = team['points']
+
+                    # Get form analysis
+                    form_data = FormAnalyzer.analyze_team_form(fixtures, team_id, matches_count)
+
+                    if form_data['matches_analyzed'] == matches_count:
+                        matches_played = team['all']['played']
+                        current_ppg = actual_points / matches_played if matches_played > 0 else 0
+                        form_ppg = form_data['points'] / matches_count
+                        form_vs_actual_diff = form_ppg - current_ppg
+
+                        all_teams.append({
+                            'team_id': team_id,
+                            'team': team_name,
+                            'league': f"{league_info.get('flag', '')} {league_info.get('name', '')}",
+                            'current_position': team['rank'],
+                            'current_points': actual_points,
+                            'current_ppg': round(current_ppg, 2),
+                            'form': ' '.join(form_data['form']),
+                            'form_points': form_data['points'],
+                            'form_ppg': round(form_ppg, 2),
+                            'performance_diff': round(form_vs_actual_diff, 2)
+                        })
+
+        else:
+            # Fetch teams for individual leagues
+            for league_id, league_info in league_names.items():
+                if isinstance(league_id, int):  # Ensure the league ID is numeric
+                    try:
+                        standings = api.fetch_standings(league_id)
+                        if not standings or not standings.get('response'):
+                            print(f"No standings available for league {league_id}")
+                            continue
+
+                        standings_data = standings['response'][0]['league']['standings'][0]
+                        fixtures = api.fetch_fixtures(league_id)
+
+                        # Analyze each team's form and add to the combined list
+                        for team in standings_data:
+                            team_id = team['team']['id']
+                            team_name = team['team']['name']
+                            actual_points = team['points']
+
+                            # Get form analysis
+                            form_data = FormAnalyzer.analyze_team_form(fixtures, team_id, matches_count)
+
+                            if form_data['matches_analyzed'] == matches_count:
+                                matches_played = team['all']['played']
+                                current_ppg = actual_points / matches_played if matches_played > 0 else 0
+                                form_ppg = form_data['points'] / matches_count
+                                form_vs_actual_diff = form_ppg - current_ppg
+
+                                all_teams.append({
+                                    'team_id': team_id,
+                                    'team': team_name,
+                                    'league': f"{league_info.get('flag', '')} {league_info.get('name', '')}",
+                                    'current_position': team['rank'],
+                                    'current_points': actual_points,
+                                    'current_ppg': round(current_ppg, 2),
+                                    'form': ' '.join(form_data['form']),
+                                    'form_points': form_data['points'],
+                                    'form_ppg': round(form_ppg, 2),
+                                    'performance_diff': round(form_vs_actual_diff, 2)
+                                })
+
+                    except Exception as e:
+                        print(f"Error processing league {league_id}: {str(e)}")
+                        continue
+            
+        # Sort combined results by absolute performance difference
+        all_teams_sorted = sorted(all_teams, key=lambda x: abs(x['performance_diff']), reverse=True)
+        return all_teams_sorted
+
+        
     def fetch_standings(self, league_id):
         url = f"{self.base_url}/standings"
-        params = {
-            "league": league_id,
-            "season": 2024
-        }
-        try:
-            response = requests.get(url, headers=self.headers, params=params)
-            return response.json() if response.status_code == 200 else None
-        except Exception as e:
-            self.logger.error(f"Error fetching standings: {str(e)}")
-            return None
+        
+        if league_id == ALL_LEAGUES:
+            # Handling for ALL_LEAGUES
+            all_standings = {}
+            
+            # Loop through the league names and fetch standings for each league
+            for league_id, league_info in LEAGUE_NAMES.items():
+                if league_id == ALL_LEAGUES:
+                    continue
+
+                params = {
+                    "league": league_id,
+                    "season": 2024
+                }
+                try:
+                    response = requests.get(url, headers=self.headers, params=params)
+                    if response.status_code == 200:
+                        all_standings[league_id] = response.json()
+                    else:
+                        self.logger.warning(f"Failed to fetch standings for league {league_id}, status code: {response.status_code}")
+                except Exception as e:
+                    self.logger.error(f"Error fetching standings for league {league_id}: {str(e)}")
+            
+            return all_standings
+        
+        else:
+            # Handling for a single league
+            params = {
+                "league": league_id,
+                "season": 2024
+            }
+            try:
+                response = requests.get(url, headers=self.headers, params=params)
+                if response.status_code == 200:
+                    return response.json()
+                else:
+                    self.logger.warning(f"Failed to fetch standings for league {league_id}, status code: {response.status_code}")
+                    return None
+            except Exception as e:
+                self.logger.error(f"Error fetching standings for league {league_id}: {str(e)}")
+                return None
         
     def fetch_teams(self, league_id, season='2024'):
         if league_id == ALL_LEAGUES:
@@ -226,3 +363,4 @@ class FootballAPI:
             return f"{float(odds_value):.2f}"
         except (ValueError, TypeError):
             return "N/A"
+    

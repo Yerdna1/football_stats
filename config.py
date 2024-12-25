@@ -3,7 +3,8 @@ BASE_URL = 'https://v3.football.api-sports.io'
 ALL_LEAGUES = -1  # Special value for all leagues
 
 LEAGUE_NAMES = {
-    "ALL_LEAGUES": "All Leagues",
+       ALL_LEAGUES: {"name": "All Leagues", "flag": "🌍", "country": "Global"},  # Use -1 here
+
     
     39: {"name": "Premier League", "flag": "GB-ENG", "country": "England"},
     140: {"name": "La Liga", "flag": "🇪🇸", "country": "Spain"},
