@@ -3,35 +3,26 @@ BASE_URL = 'https://v3.football.api-sports.io'
 ALL_LEAGUES = -1  # Special value for all leagues
 
 LEAGUE_NAMES = {
-   ALL_LEAGUES: 'All Leagues',
-   39: 'English Premier League',
-   140: 'La Liga', 
-   78: 'Bundesliga',
-   135: 'Serie A',
-   61: 'Ligue 1',
-   94: 'Primeira Liga', # Portugal
-   88: 'Eredivisie', # Netherlands
-   203: 'Super League', # Greece
-   119: 'Bundesliga', # Austria
-   207: 'Super Lig', # Turkey
-   180: 'First Division A', # Belgium
-   144: 'Allsvenskan', # Sweden
-   40: 'Championship', # England 2nd tier
-   141: 'Segunda División', # Spain 2nd tier
-   136: 'Serie B', # Italy 2nd tier
-   179: 'Ukrainian Premier League',
-   98: 'Czech First League',
-   91: 'Ekstraklasa', # Poland
-   106: 'Fortuna Liga', # Slovakia 
-   113: 'Eliteserien', # Norway
-   239: 'Primeira Liga', # Brazil
-   128: 'Liga I', # Romania
-   197: 'Super Liga', # Serbia
-   172: 'Russian Premier League',
-   103: 'Superliga', # Denmark
-   71: 'Brazilian Serie A',
-   266: 'Chinese Super League',
-   253: 'Major League Soccer', # USA
-   188: 'Swiss Super League',
-   144: 'Allsvenskan' # Sweden
+    "ALL_LEAGUES": "All Leagues",
+    
+    39: {"name": "Premier League", "flag": "GB-ENG", "country": "England"},
+    140: {"name": "La Liga", "flag": "🇪🇸", "country": "Spain"},
+    78: {"name": "Bundesliga", "flag": "🇩🇪", "country": "Germany"},
+    135: {"name": "Serie A", "flag": "🇮🇹", "country": "Italy"},
+    61: {"name": "Ligue 1", "flag": "🇫🇷", "country": "France"},
+
+    88: {"name": "Eredivisie", "flag": "🇳🇱", "country": "Netherlands"},
+    144: {"name": "Jupiler Pro League", "flag": "🇧🇪", "country": "Belgium"}, 
+    94: {"name": "Primeira Liga", "flag": "🇵🇹", "country": "Portugal"},
+    179: {"name": "Scottish Premiership", "flag": "SC", "country": "Scotland"},
+    203: {"name": "Super Lig", "flag": "🇹🇷", "country": "Turkey"},
+    207: {"name": "Swiss Super League", "flag": "🇨🇭", "country": "Switzerland"},
+    113: {"name": "Allsvenskan", "flag": "🇸🇪", "country": "Sweden"}, 
+    119: {"name": "Danish Superliga", "flag": "🇩🇰", "country": "Denmark"},
+    103: {"name": "Eliteserien", "flag": "🇳🇴", "country": "Norway"},
+    106: {"name": "Ekstraklasa", "flag": "🇵🇱", "country": "Poland"},
+   152: {"name": "Czech First League", "flag": "🇨🇿", "country": "Czech Republic"},
+   128: {"name": "Austrian Bundesliga", "flag": "🇦🇹", "country": "Austria"},
+   319: {"name": "Slovakian Super Liga", "flag": "🇸🇰", "country": "Slovakia"},
+   271: {"name": "Nemzeti Bajnokság I", "flag": "🇭🇺", "country": "Hungary"}
 }
