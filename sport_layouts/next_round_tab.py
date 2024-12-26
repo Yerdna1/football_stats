@@ -26,24 +26,38 @@ def create_next_round_tab():
                 id='next-fixtures-table',
                 columns=[
                     {'name': 'Date', 'id': 'date'},
+                    {'name': 'Time', 'id': 'time'},
+                    {'name': 'League', 'id': 'league'},
+                    {'name': 'Round', 'id': 'round'},
                     {'name': 'Home Team', 'id': 'home_team'},
                     {'name': 'Away Team', 'id': 'away_team'},
-                    {'name': 'Home Win', 'id': 'home_odds'},
-                    {'name': 'Draw', 'id': 'draw_odds'},
-                    {'name': 'Away Win', 'id': 'away_odds'},
                     {'name': 'Venue', 'id': 'venue'},
-                    {'name': 'Time', 'id': 'time'}
+                    {'name': 'Home', 'id': 'home_odds'},
+                    {'name': 'Draw', 'id': 'draw_odds'},
+                    {'name': 'Away', 'id': 'away_odds'}
                 ],
-                style_cell=table_cell_style,
-                style_header=table_header_style,
-                style_table=table_style,
                 style_data_conditional=[
                     {
-                        'if': {'column_id': col},
-                        'backgroundColor': '#f8f9fa',
-                        'fontWeight': 'bold'
-                    } for col in ['home_odds', 'draw_odds', 'away_odds']
-                ]
+                        'if': {'row_index': 'odd'},
+                        'backgroundColor': 'rgb(248, 248, 248)'
+                    },
+                    {
+                        'if': {'filter_query': '{is_header} eq true'},
+                        'backgroundColor': 'rgb(200, 200, 200)',
+                        'fontWeight': 'bold',
+                        'fontSize': '16px',
+                        'textAlign': 'center'
+                    }
+                ],
+                style_cell={
+                    'textAlign': 'left',
+                    'padding': '10px',
+                    'minWidth': '100px'
+                },
+                style_header={
+                    'backgroundColor': 'rgb(230, 230, 230)',
+                    'fontWeight': 'bold'
+                }
             )
         ]),
         

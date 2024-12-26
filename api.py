@@ -3,7 +3,10 @@ import time
 import requests
 import logging
 from functools import lru_cache
-from config import ALL_LEAGUES, LEAGUE_NAMES
+import json
+from typing import Dict, Any, Optional
+
+from config import ALL_LEAGUES, LEAGUE_NAMES, PERF_DIFF_THRESHOLD
 from sport_analyzers.form_analyzer import FormAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -14,341 +17,312 @@ class FootballAPI:
         self.base_url = base_url
         self.headers = {'x-apisports-key': api_key}
         self.logger = logging.getLogger(__name__)
-        self.cache = {}
-        self.cache_duration = timedelta(minutes=15)  # Cache for 15 minutes
+        self._initialize_cache()
         
-    def _get_from_cache(self, key):
-        if key in self.cache:
-            data, timestamp = self.cache[key]
-            if datetime.now() - timestamp < self.cache_duration:
+    def _initialize_cache(self):
+        """Initialize different cache stores with different durations"""
+        self.cache = {
+            'short': {'data': {}, 'duration': timedelta(minutes=15)},  # 15 minutes for volatile data
+            'medium': {'data': {}, 'duration': timedelta(hours=6)},    # 6 hours for semi-stable data
+            'long': {'data': {}, 'duration': timedelta(hours=24)},     # 24 hours for stable data
+        }
+        
+    def _get_from_cache(self, key: str, cache_type: str = 'short') -> Optional[Any]:
+        """Get data from cache with specified duration type"""
+        cache_store = self.cache[cache_type]['data']
+        if key in cache_store:
+            data, timestamp = cache_store[key]
+            if datetime.now() - timestamp < self.cache[cache_type]['duration']:
                 return data
-            del self.cache[key]
+            del cache_store[key]
         return None
 
-    def _set_cache(self, key, data):
-        self.cache[key] = (data, datetime.now())
-        
-    def fetch_all_teams(api, league_names, matches_count=3):
-        """
-        Fetch all teams across all leagues by iterating through league IDs.
-        :param api: API object with methods to fetch standings and fixtures.
-        :param league_names: Dictionary of league IDs and names.
-        :param matches_count: Number of matches to analyze for form (optional).
-        :return: List of all teams with combined analysis.
-        """
-        all_teams = []
+    def _set_cache(self, key: str, data: Any, cache_type: str = 'short'):
+        """Set data in cache with specified duration type"""
+        self.cache[cache_type]['data'][key] = (data, datetime.now())
 
-        if league_names.get(ALL_LEAGUES):
-            standings = api.fetch_standings(ALL_LEAGUES)
+    def _batch_request(self, url: str, params_list: list) -> Dict:
+        """Make batch requests and handle rate limiting"""
+        results = {}
+        for params in params_list:
+            cache_key = f"{url}_{json.dumps(params, sort_keys=True)}"
+            cached_data = self._get_from_cache(cache_key)
             
-            if not standings:
-                print(f"No standings available for ALL_LEAGUES.")
-                return []
+            if cached_data:
+                results[json.dumps(params)] = cached_data
+                continue
 
-            # Iterate through each league's standings and fixtures
-            for league_id, league_standings in standings.items():
-                league_info = league_names.get(league_id)
-                if not league_info:
-                    print(f"No information available for league ID {league_id}")
-                    continue
-
-                standings_data = league_standings['response'][0]['league']['standings'][0]
-                fixtures = api.fetch_fixtures(league_id)
-
-                # Analyze each team's form and add to the combined list
-                for team in standings_data:
-                    team_id = team['team']['id']
-                    team_name = team['team']['name']
-                    actual_points = team['points']
-
-                    # Get form analysis
-                    form_data = FormAnalyzer.analyze_team_form(fixtures, team_id, matches_count)
-
-                    if form_data['matches_analyzed'] == matches_count:
-                        matches_played = team['all']['played']
-                        current_ppg = actual_points / matches_played if matches_played > 0 else 0
-                        form_ppg = form_data['points'] / matches_count
-                        form_vs_actual_diff = form_ppg - current_ppg
-
-                        all_teams.append({
-                            'team_id': team_id,
-                            'team': team_name,
-                            'league': f"{league_info.get('flag', '')} {league_info.get('name', '')}",
-                            'current_position': team['rank'],
-                            'current_points': actual_points,
-                            'current_ppg': round(current_ppg, 2),
-                            'form': ' '.join(form_data['form']),
-                            'form_points': form_data['points'],
-                            'form_ppg': round(form_ppg, 2),
-                            'performance_diff': round(form_vs_actual_diff, 2)
-                        })
-
-        else:
-            # Fetch teams for individual leagues
-            for league_id, league_info in league_names.items():
-                if isinstance(league_id, int):  # Ensure the league ID is numeric
-                    try:
-                        standings = api.fetch_standings(league_id)
-                        if not standings or not standings.get('response'):
-                            print(f"No standings available for league {league_id}")
-                            continue
-
-                        standings_data = standings['response'][0]['league']['standings'][0]
-                        fixtures = api.fetch_fixtures(league_id)
-
-                        # Analyze each team's form and add to the combined list
-                        for team in standings_data:
-                            team_id = team['team']['id']
-                            team_name = team['team']['name']
-                            actual_points = team['points']
-
-                            # Get form analysis
-                            form_data = FormAnalyzer.analyze_team_form(fixtures, team_id, matches_count)
-
-                            if form_data['matches_analyzed'] == matches_count:
-                                matches_played = team['all']['played']
-                                current_ppg = actual_points / matches_played if matches_played > 0 else 0
-                                form_ppg = form_data['points'] / matches_count
-                                form_vs_actual_diff = form_ppg - current_ppg
-
-                                all_teams.append({
-                                    'team_id': team_id,
-                                    'team': team_name,
-                                    'league': f"{league_info.get('flag', '')} {league_info.get('name', '')}",
-                                    'current_position': team['rank'],
-                                    'current_points': actual_points,
-                                    'current_ppg': round(current_ppg, 2),
-                                    'form': ' '.join(form_data['form']),
-                                    'form_points': form_data['points'],
-                                    'form_ppg': round(form_ppg, 2),
-                                    'performance_diff': round(form_vs_actual_diff, 2)
-                                })
-
-                    except Exception as e:
-                        print(f"Error processing league {league_id}: {str(e)}")
-                        continue
-            
-        # Sort combined results by absolute performance difference
-        all_teams_sorted = sorted(all_teams, key=lambda x: abs(x['performance_diff']), reverse=True)
-        return all_teams_sorted
-
-        
-    def fetch_standings(self, league_id):
-        cache_key = f'standings_{league_id}'
-        cached_data = self._get_from_cache(cache_key)
-        if cached_data:
-            return cached_data
-        
-        url = f"{self.base_url}/standings"
-        
-        if league_id == ALL_LEAGUES:
-            # Handling for ALL_LEAGUES
-            all_standings = {}
-            
-            # Loop through the league names and fetch standings for each league
-            for league_id, league_info in LEAGUE_NAMES.items():
-                if league_id == ALL_LEAGUES:
-                    continue
-
-                params = {
-                    "league": league_id,
-                    "season": 2024
-                }
-                try:
-                    response = requests.get(url, headers=self.headers, params=params)
-                    if response.status_code == 200:
-                        all_standings[league_id] = response.json()
-                    else:
-                        self.logger.warning(f"Failed to fetch standings for league {league_id}, status code: {response.status_code}")
-                except Exception as e:
-                    self.logger.error(f"Error fetching standings for league {league_id}: {str(e)}")
-            self._set_cache(cache_key, all_standings)
-            return all_standings
-        
-        else:
-            # Handling for a single league
-            params = {
-                "league": league_id,
-                "season": 2024
-            }
             try:
                 response = requests.get(url, headers=self.headers, params=params)
                 if response.status_code == 200:
-                    self._set_cache(cache_key, response.json())
-                    return response.json()
-                else:
-                    self.logger.warning(f"Failed to fetch standings for league {league_id}, status code: {response.status_code}")
-                    return None
+                    data = response.json()
+                    self._set_cache(cache_key, data)
+                    results[json.dumps(params)] = data
+                elif response.status_code == 429:  # Rate limit
+                    time.sleep(60)  # Wait a minute before retrying
+                    response = requests.get(url, headers=self.headers, params=params)
+                    if response.status_code == 200:
+                        data = response.json()
+                        self._set_cache(cache_key, data)
+                        results[json.dumps(params)] = data
+                time.sleep(0.2)  # Small delay between requests
             except Exception as e:
-                self.logger.error(f"Error fetching standings for league {league_id}: {str(e)}")
-                return None
+                self.logger.error(f"Error in batch request: {str(e)}")
+                continue
+                
+        return results
+    def fetch_all_teams(self, league_names, matches_count=3):
+        """
+        Fetch all teams across all leagues with form analysis
         
-    def fetch_teams(self, league_id, season='2024'):
-        if league_id == ALL_LEAGUES:
-            all_teams = []
-            for lid in LEAGUE_NAMES.keys():
-                 if lid != ALL_LEAGUES:
-                    teams = self.fetch_teams(lid, season)
-                    all_teams.extend(teams)
-            return all_teams
-    
-        url = f"{self.base_url}/teams"
-        params = {
-            'league': league_id,
-            'season': season
-        }
-        
-        response = requests.get(url, headers=self.headers, params=params)
-        if response.status_code == 200:
-            return response.json().get('response', [])
-        return []
-    def _make_request(self, url, params=None):
+        Args:
+            league_names: Dictionary of league IDs and names
+            matches_count: Number of recent matches to analyze for form
+            
+        Returns:
+            list: List of teams with their form analysis
+        """
+        logger.debug(f"Fetching all teams for {len(league_names)} leagues")
+        all_teams = []
+
         try:
-            response = requests.get(url, headers=self.headers, params=params)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"API request failed: {str(e)}")
-            return None
-        
-    @lru_cache(maxsize=32)
-    def fetch_fixtures(self, league_id, season='2024', team_id=None, fixture_id=None):
-        cache_key = f'fixtures_{league_id}_{team_id}_{fixture_id}'
-        cached_data = self._get_from_cache(cache_key)
-        if cached_data:
-            return cached_data
-    
-        # If fixture_id is provided, fetch specific fixture
-        if fixture_id is not None:
-            url = f"{self.base_url}/fixtures"
-            params = {'id': fixture_id}
-            response = requests.get(url, headers=self.headers, params=params)
-            if response.status_code == 200:
-                self._set_cache(cache_key, response.json().get('response', []))
-                return response.json().get('response', [])
+            # Process ALL_LEAGUES case
+            if league_names.get(ALL_LEAGUES):
+                standings = self.fetch_standings(ALL_LEAGUES)
+                
+                if not standings:
+                    logger.warning("No standings available for ALL_LEAGUES")
+                    return []
+
+                # Process each league
+                for league_id, league_standings in standings.items():
+                    league_info = league_names.get(league_id, {})
+                    if not league_info:
+                        logger.warning(f"No information for league {league_id}")
+                        continue
+
+                    try:
+                        # Get standings data safely
+                        response = league_standings.get('response', [{}])[0]
+                        standings_data = response.get('league', {}).get('standings', [[]])[0]
+                        
+                        # Get fixtures with caching
+                        fixtures = self.fetch_fixtures(league_id)
+
+                        # Process each team
+                        for team in standings_data:
+                            try:
+                                team_data = team.get('team', {})
+                                team_id = team_data.get('id')
+                                if not team_id:
+                                    continue
+
+                                team_name = team_data.get('name', 'Unknown')
+                                matches_played = team.get('all', {}).get('played', 0)
+                                
+                                if matches_played == 0:
+                                    continue
+
+                                actual_points = team.get('points', 0)
+                                current_ppg = actual_points / matches_played if matches_played > 0 else 0
+
+                                # Analyze team form
+                                form_data = FormAnalyzer.analyze_team_form(fixtures, team_id, matches_count)
+                                
+                                form_points = form_data['points']
+                                form_matches = form_data['matches_analyzed']
+                                form_ppg = form_points / matches_count if form_matches > 0 else 0
+                                form_vs_actual_diff = form_ppg - current_ppg
+                                
+                                # Include team info
+                                performance_diff = round(form_vs_actual_diff, 2)
+                                if abs(performance_diff) > PERF_DIFF_THRESHOLD:  # Filter teams here
+                                    team_info = {
+                                        'team_id': team_id,
+                                        'team': team_name,
+                                        'league': f"{league_info.get('flag', '')} {league_info.get('name', '')}",
+                                        'current_position': team.get('rank', 0),
+                                        'matches_played': matches_played,
+                                        'current_points': actual_points,
+                                        'current_ppg': round(current_ppg, 2),
+                                        'form': ' '.join(form_data['form']),
+                                        'form_points': form_points,
+                                        'form_ppg': round(form_ppg, 2),
+                                        'performance_diff': round(form_vs_actual_diff, 2),
+                                        'goals_for': form_data['goals_for'],
+                                        'goals_against': form_data['goals_against']
+                                    }
+                                    
+                                    all_teams.append(team_info)
+
+                            except Exception as e:
+                                logger.error(f"Error processing team {team_data.get('name', 'Unknown')}: {str(e)}")
+                                continue
+
+                    except Exception as e:
+                        logger.error(f"Error processing league {league_id}: {str(e)}")
+                        continue
+
+            else:
+                # Process individual leagues
+                for league_id, league_info in league_names.items():
+                    if not isinstance(league_id, int):
+                        continue
+
+                    try:
+                        standings = self.fetch_standings(league_id)
+                        if not standings or not standings.get('response'):
+                            logger.warning(f"No standings for league {league_id}")
+                            continue
+
+                        standings_data = standings['response'][0]['league']['standings'][0]
+                        fixtures = self.fetch_fixtures(league_id)
+
+                        for team in standings_data:
+                            try:
+                                team_data = team.get('team', {})
+                                team_id = team_data.get('id')
+                                if not team_id:
+                                    continue
+
+                                team_name = team_data.get('name', 'Unknown')
+                                matches_played = team.get('all', {}).get('played', 0)
+                                
+                                if matches_played == 0:
+                                    continue
+
+                                actual_points = team.get('points', 0)
+                                current_ppg = actual_points / matches_played if matches_played > 0 else 0
+
+                                # Analyze team form
+                                form_data = FormAnalyzer.analyze_team_form(fixtures, team_id, matches_count)
+                                
+                                form_points = form_data['points']
+                                form_matches = form_data['matches_analyzed']
+                                form_ppg = form_points / matches_count if form_matches > 0 else 0
+                                form_vs_actual_diff = form_ppg - current_ppg
+                                 # Include team info
+                                performance_diff = round(form_vs_actual_diff, 2)
+                                if abs(performance_diff) > PERF_DIFF_THRESHOLD:  # Filter teams here
+
+                                    team_info = {
+                                        'team_id': team_id,
+                                        'team': team_name,
+                                        'league': f"{league_info.get('flag', '')} {league_info.get('name', '')}",
+                                        'current_position': team.get('rank', 0),
+                                        'matches_played': matches_played,
+                                        'current_points': actual_points,
+                                        'current_ppg': round(current_ppg, 2),
+                                        'form': ' '.join(form_data['form']),
+                                        'form_points': form_points,
+                                        'form_ppg': round(form_ppg, 2),
+                                        'performance_diff': round(form_vs_actual_diff, 2),
+                                        'goals_for': form_data['goals_for'],
+                                        'goals_against': form_data['goals_against']
+                                    }
+                                    
+                                    all_teams.append(team_info)
+
+                            except Exception as e:
+                                logger.error(f"Error processing team {team_data.get('name', 'Unknown')}: {str(e)}")
+                                continue
+
+                    except Exception as e:
+                        logger.error(f"Error processing league {league_id}: {str(e)}")
+                        continue
+
+        except Exception as e:
+            logger.error(f"Error in fetch_all_teams: {str(e)}")
             return []
 
-        # Otherwise, fetch fixtures by league/team
+        # Sort by absolute performance difference
+        return sorted(all_teams, key=lambda x: abs(x.get('performance_diff', 0)), reverse=True)
+
+    def fetch_standings(self, league_id):
+        """Optimized standings fetch with better caching"""
+        cache_key = f'standings_{league_id}'
+        cached_data = self._get_from_cache(cache_key, 'medium')  # Standings change less frequently
+        if cached_data:
+            return cached_data
+
+        url = f"{self.base_url}/standings"
         if league_id == ALL_LEAGUES:
+            # Batch request for all leagues
+            params_list = [
+                {"league": lid, "season": 2024}
+                for lid in LEAGUE_NAMES.keys()
+                if isinstance(lid, int) and lid != ALL_LEAGUES
+            ]
+            results = self._batch_request(url, params_list)
+            
+            all_standings = {}
+            for params_str, data in results.items():
+                params = json.loads(params_str)
+                all_standings[params['league']] = data
+                
+            self._set_cache(cache_key, all_standings, 'medium')
+            return all_standings
+        else:
+            params = {"league": league_id, "season": 2024}
+            results = self._batch_request(url, [params])
+            data = results.get(json.dumps(params))
+            if data:
+                self._set_cache(cache_key, data, 'medium')
+                return data
+        return None
+
+    def fetch_fixtures(self, league_id, season='2024', team_id=None, fixture_id=None):
+        """Optimized fixtures fetch with smarter caching"""
+        cache_key = f'fixtures_{league_id}_{team_id}_{fixture_id}'
+        
+        # Use longer cache duration for historical fixtures
+        cache_type = 'long' if not fixture_id else 'short'
+        cached_data = self._get_from_cache(cache_key, cache_type)
+        if cached_data:
+            return cached_data
+
+        url = f"{self.base_url}/fixtures"
+        
+        if fixture_id:
+            params = {'id': fixture_id}
+            results = self._batch_request(url, [params])
+            data = results.get(json.dumps(params), {}).get('response', [])
+            self._set_cache(cache_key, data, cache_type)
+            return data
+
+        if league_id == ALL_LEAGUES:
+            params_list = [
+                {'league': lid, 'season': season, **({"team": team_id} if team_id else {})}
+                for lid in LEAGUE_NAMES.keys()
+                if isinstance(lid, int) and lid != ALL_LEAGUES
+            ]
+            results = self._batch_request(url, params_list)
+            
             all_fixtures = []
-            for lid in LEAGUE_NAMES:
-                # Skip non-numeric and ALL_LEAGUES entries
-                if isinstance(lid, int) and lid != ALL_LEAGUES:
-                    try:
-                        fixtures = self.fetch_fixtures(lid, season, team_id)
-                        if fixtures:
-                            all_fixtures.extend(fixtures)
-                    except Exception as e:
-                        self.logger.error(f"Error fetching fixtures for league {lid}: {str(e)}")
-                        continue
-            self._set_cache(cache_key, all_fixtures)
+            for result in results.values():
+                if result and result.get('response'):
+                    all_fixtures.extend(result['response'])
+                    
+            self._set_cache(cache_key, all_fixtures, cache_type)
             return all_fixtures
         
-        url = f"{self.base_url}/fixtures"
-        params = {
-            'league': league_id,
-            'season': season
-        }
-        if team_id:
-            params['team'] = team_id
-            
-        response = requests.get(url, headers=self.headers, params=params)
-        if response.status_code == 200:
-            self._set_cache(cache_key, response.json().get('response', []))
-            return response.json().get('response', [])
-        return []
-
-    def fetch_next_fixtures(self, league_id, season='2024'):
-        """Fetch next round of fixtures for a league"""
-        url = f"{self.base_url}/fixtures"
         params = {
             'league': league_id,
             'season': season,
-            'next': 10  # Fetch next 10 matches to ensure we get the full round
+            **({"team": team_id} if team_id else {})
         }
-        
-        response = requests.get(url, headers=self.headers, params=params)
-        if response.status_code == 200:
-            fixtures = response.json().get('response', [])
-            if fixtures:
-                # Group by round and get the next round
-                rounds = {}
-                for fix in fixtures:
-                    round_num = fix['league']['round']
-                    if round_num not in rounds:
-                        rounds[round_num] = []
-                    rounds[round_num].append(fix)
-                
-                # Return the earliest round
-                return next(iter(rounds.values())) if rounds else []
-        return []
+        results = self._batch_request(url, [params])
+        data = results.get(json.dumps(params), {}).get('response', [])
+        self._set_cache(cache_key, data, cache_type)
+        return data
 
-    def fetch_player_statistics(self, league_id, team_id, season='2024'):
-        """Fetch player statistics for a team"""
-        # First try to get players list
-        players_url = f"{self.base_url}/players/squads"
-        squad_params = {
-            'team': team_id
-        }
-        
-        logger.info(f"Fetching squad for team {team_id}")
-        
-        try:
-            squad_response = requests.get(players_url, headers=self.headers, params=squad_params)
-            if squad_response.status_code != 200:
-                logger.error(f"Error fetching squad. Status: {squad_response.status_code}")
-                return []
-                
-            squad_data = squad_response.json()
-            if not squad_data.get('response'):
-                logger.error("No squad data found")
-                return []
-                
-            # Get squad players
-            squad = squad_data['response'][0]['players']
-            logger.info(f"Found {len(squad)} players in squad")
-            
-            # Now fetch statistics for each player
-            all_player_stats = []
-            for player in squad:
-                player_id = player['id']
-                
-                # Get player statistics
-                stats_url = f"{self.base_url}/players"
-                stats_params = {
-                    'id': player_id,
-                    'league': league_id,
-                    'season': season
-                }
-                
-                logger.info(f"Fetching stats for player {player['name']} (ID: {player_id})")
-                
-                stats_response = requests.get(stats_url, headers=self.headers, params=stats_params)
-                if stats_response.status_code == 200:
-                    stats_data = stats_response.json()
-                    if stats_data.get('response'):
-                        logger.info(f"Found statistics for {player['name']}")
-                        all_player_stats.extend(stats_data['response'])
-                else:
-                    logger.warning(f"Could not get stats for {player['name']}")
-                
-                # Add small delay to avoid rate limits
-                time.sleep(0.1)
-            
-            return all_player_stats
-            
-        except Exception as e:
-            logger.error(f"Error fetching player statistics: {str(e)}")
-            return []
-        
-    @lru_cache(maxsize=128)
     def fetch_team_statistics(self, league_id, team_id, season='2024'):
+        """Optimized team statistics fetch with null safety"""
         cache_key = f'team_stats_{league_id}_{team_id}'
-        cached_data = self._get_from_cache(cache_key)
+        cached_data = self._get_from_cache(cache_key, 'medium')
         if cached_data:
             return cached_data
-        
-        """Fetch team statistics"""
+            
         url = f"{self.base_url}/teams/statistics"
         params = {
             'league': league_id,
@@ -356,20 +330,58 @@ class FootballAPI:
             'season': season
         }
         
-        logger.debug(f"Fetching team stats with params: {params}")
-        response = requests.get(url, headers=self.headers, params=params)
-        
-        if response.status_code == 200:
-            data = response.json()
-            logger.debug(f"Team stats response: {data}")
-            self._set_cache(cache_key, data.get('response', {}))
-            return data.get('response', {})
-        else:
-            logger.error(f"Error fetching team stats. Status code: {response.status_code}")
-            logger.error(f"Response: {response.text}")
+        try:
+            results = self._batch_request(url, [params])
+            data = results.get(json.dumps(params), {}).get('response', {})
+            
+            # Ensure we have valid data structure
+            if not data:
+                self.logger.warning(f"No team statistics found for team {team_id} in league {league_id}")
+                return {}
+                
+            # Ensure all required fields have default values
+            stats = {
+                'form': data.get('form', ''),
+                'fixtures': data.get('fixtures', {}),
+                'goals': data.get('goals', {}),
+                'biggest': data.get('biggest', {}),
+                'clean_sheet': data.get('clean_sheet', {}),
+                'failed_to_score': data.get('failed_to_score', {}),
+                'penalty': data.get('penalty', {}),
+                'lineups': data.get('lineups', []),
+                'cards': data.get('cards', {})
+            }
+            
+            self._set_cache(cache_key, stats, 'medium')
+            return stats
+            
+        except Exception as e:
+            self.logger.error(f"Error fetching team statistics for {team_id}: {str(e)}")
             return {}
+
+    def fetch_player_statistics(self, league_id, team_id, season='2024'):
+        """Optimized player statistics fetch with batch processing"""
+        cache_key = f'player_stats_{league_id}_{team_id}'
+        cached_data = self._get_from_cache(cache_key, 'medium')
+        if cached_data:
+            return cached_data
+
+        # Fetch squad first
+        squad_url = f"{self.base_url}/players/squads"
+        squad_params = {'team': team_id}
+        squad_results = self._batch_request(squad_url, [squad_params])
+        squad_data = squad_results.get(json.dumps(squad_params))
         
+        if not squad_data or not squad_data.get('response'):
+            return []
+
     def fetch_match_odds(self, fixture_id):
+        """Fetch match odds with very short caching duration and null safety"""
+        cache_key = f'odds_{fixture_id}'
+        cached_data = self._get_from_cache(cache_key, 'short')  # Short cache for odds
+        if cached_data:
+            return cached_data
+            
         url = f"{self.base_url}/odds"
         params = {
             "fixture": fixture_id,
@@ -377,50 +389,111 @@ class FootballAPI:
         }
         
         try:
-            response = self._make_request(url, params)
-            #print(f"Odds API Response for fixture {fixture_id}:", response)  # Debug print
+            results = self._batch_request(url, [params])
+            data = results.get(json.dumps(params))
             
-            if response and response.get('response'):
-                odds_data = response['response'][0]
-                #print("Odds data:", odds_data)  # Debug print
-                return {
-                    'home': odds_data['bookmakers'][0]['bets'][0]['values'][0]['odd'],
-                    'draw': odds_data['bookmakers'][0]['bets'][0]['values'][1]['odd'],
-                    'away': odds_data['bookmakers'][0]['bets'][0]['values'][2]['odd']
+            if data and data.get('response'):
+                response_data = data['response']
+                if not response_data:
+                    self.logger.warning(f"No odds data found for fixture {fixture_id}")
+                    return {'home': '0', 'draw': '0', 'away': '0'}
+                    
+                odds_data = response_data[0]
+                if not odds_data.get('bookmakers'):
+                    self.logger.warning(f"No bookmakers found for fixture {fixture_id}")
+                    return {'home': '0', 'draw': '0', 'away': '0'}
+                    
+                bookmaker = odds_data['bookmakers'][0]
+                if not bookmaker.get('bets'):
+                    self.logger.warning(f"No bets found for fixture {fixture_id}")
+                    return {'home': '0', 'draw': '0', 'away': '0'}
+                    
+                bets = bookmaker['bets'][0]
+                if not bets.get('values') or len(bets['values']) < 3:
+                    self.logger.warning(f"Incomplete odds values for fixture {fixture_id}")
+                    return {'home': '0', 'draw': '0', 'away': '0'}
+                    
+                odds = {
+                    'home': bets['values'][0].get('odd', '0'),
+                    'draw': bets['values'][1].get('odd', '0'),
+                    'away': bets['values'][2].get('odd', '0')
                 }
+                self._set_cache(cache_key, odds, 'short')
+                return odds
+                
         except Exception as e:
             self.logger.error(f"Error parsing odds for fixture {fixture_id}: {str(e)}")
-            print(f"Error details: {str(e)}")  # Debug print
-            return None
+            
+        return {'home': '0', 'draw': '0', 'away': '0'}
+
+    @staticmethod
     def format_odds(odds_value):
-        """
-        Format odds value to decimal format with 2 decimal places
-        """
+        """Format odds value to decimal format with 2 decimal places"""
         try:
             return f"{float(odds_value):.2f}"
         except (ValueError, TypeError):
             return "N/A"
+
+        # Batch process player statistics
+        squad = squad_data['response'][0]['players']
+        stats_url = f"{self.base_url}/players"
+        params_list = [
+            {'id': player['id'], 'league': league_id, 'season': season}
+            for player in squad
+        ]
         
-    def fetch_api_usage(self):
-        cache_key = 'api_usage'
-        cached_data = self._get_from_cache(cache_key)
+        # Split into smaller batches to avoid overwhelming the API
+        batch_size = 5
+        all_stats = []
+        
+        for i in range(0, len(params_list), batch_size):
+            batch_params = params_list[i:i + batch_size]
+            results = self._batch_request(stats_url, batch_params)
+            
+            for result in results.values():
+                if result and result.get('response'):
+                    all_stats.extend(result['response'])
+            
+            time.sleep(1)  # Pause between batches
+            
+        self._set_cache(cache_key, all_stats, 'medium')
+        return all_stats
+        
+   
+        
+    def fetch_next_fixtures(self, league_id, season='2024'):
+        """Fetch next round of fixtures for a league with short-term caching"""
+        cache_key = f'next_fixtures_{league_id}_{season}'
+        cached_data = self._get_from_cache(cache_key, 'short')  # Short cache for upcoming fixtures
         if cached_data:
             return cached_data
+            
+        url = f"{self.base_url}/fixtures"
+        params = {
+            'league': league_id,
+            'season': season,
+            'next': 10  # Fetch next 10 matches to ensure we get the full round
+        }
         
-        url = f"{self.base_url}/status"
-        response = requests.get(url, headers=self.headers)
-        if response.status_code == 200:
-            data = response.json()
-            if isinstance(data['response'], list) and data['response']:
-                requests_info = data['response'][0].get('requests', {})
-                self._set_cache(cache_key, {
-                    'current': requests_info.get('current', 0),
-                    'limit_day': requests_info.get('limit_day', 0)
-                })
-                return {
-                    'current': requests_info.get('current', 0),
-                    'limit_day': requests_info.get('limit_day', 0)
-                }
-        
-        return {'current': 0, 'limit_day': 0}
-    
+        try:
+            results = self._batch_request(url, [params])
+            data = results.get(json.dumps(params), {}).get('response', [])
+            
+            if data:
+                # Group by round and get the next round
+                rounds = {}
+                for fix in data:
+                    round_num = fix['league']['round']
+                    if round_num not in rounds:
+                        rounds[round_num] = []
+                    rounds[round_num].append(fix)
+                
+                # Get the earliest round
+                next_round = next(iter(rounds.values())) if rounds else []
+                self._set_cache(cache_key, next_round, 'short')  # Short cache duration for upcoming fixtures
+                return next_round
+                
+        except Exception as e:
+            self.logger.error(f"Error fetching next fixtures: {str(e)}")
+            
+        return []

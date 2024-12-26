@@ -1,156 +1,261 @@
-import logging
 from datetime import datetime
-from config import ALL_LEAGUES, LEAGUE_NAMES
+import logging
 
-# Setup logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class FormAnalyzer:
     @staticmethod
-    def calculate_form_points(results, matches_count=3):
-        """Calculate points from last N matches."""
-        points = 0
-        for result in results[:matches_count]:
-            if result == 'W':
-                points += 3
-            elif result == 'D':
-                points += 1
-        return points
-
-    @staticmethod
     def analyze_team_form(fixtures, team_id, matches_count=3):
-        """Analyze a team's form for the last N matches."""
-        team_matches = []
-        form = []
+        """
+        Analyze a team's recent form with enhanced debugging and null safety
+        """
+        logger.debug(f"Starting form analysis for team {team_id}")
         
-        # Sort fixtures by date
-        sorted_fixtures = sorted(
-            fixtures,
-            key=lambda x: datetime.strptime(x['fixture']['date'], '%Y-%m-%dT%H:%M:%S%z'),
-            reverse=True
-        )
-        
-        # Get completed matches
-        for fixture in sorted_fixtures:
-            if fixture['fixture']['status']['short'] != 'FT':
-                continue
+        # Validate input parameters
+        if not fixtures:
+            logger.debug("No fixtures provided")
+            return FormAnalyzer._get_default_form(matches_count)
+        if not team_id:
+            logger.debug("No team_id provided")
+            return FormAnalyzer._get_default_form(matches_count)
 
-            home_team = fixture['teams']['home']
-            away_team = fixture['teams']['away']
-
-            if home_team['id'] == team_id or away_team['id'] == team_id:
-                is_home = home_team['id'] == team_id
-                team_score = fixture['score']['fulltime']['home'] if is_home else fixture['score']['fulltime']['away']
-                opponent_score = fixture['score']['fulltime']['away'] if is_home else fixture['score']['fulltime']['home']
-                
-                # Determine result
-                if team_score > opponent_score:
-                    form.append('W')
-                elif team_score < opponent_score:
-                    form.append('L')
-                else:
-                    form.append('D')
-
-                team_matches.append(fixture)
-
-                if len(form) >= matches_count:
-                    break
-        
-        # Calculate form points
-        form_points = FormAnalyzer.calculate_form_points(form, matches_count)
-
-        return {
-            'form': form[:matches_count],
-            'points': form_points,
-            'matches_analyzed': len(form)
-        }
-
-
-    @staticmethod
-    def analyze_all_leagues_standings_vs_form(api, matches_count=3):
-        """Compare actual standings with form-based standings across all leagues."""
-        form_analysis = []
-
-        logger.info(f"Starting analysis for ALL_LEAGUES at {datetime.now()}...")
-
-        if ALL_LEAGUES in LEAGUE_NAMES:
-            logger.info(f"Processing ALL_LEAGUES...")
-
-            # Check if ALL_LEAGUES is in LEAGUE_NAMES
-            if ALL_LEAGUES not in LEAGUE_NAMES:
-                logger.error("Error: ALL_LEAGUES is not defined in LEAGUE_NAMES")
-            else:
-                logger.info(f"ALL_LEAGUES found: {LEAGUE_NAMES[ALL_LEAGUES]}")
-
-            for league_id, league_info in LEAGUE_NAMES.items():
-                if league_id == ALL_LEAGUES:  # Skip processing ALL_LEAGUES itself
-                    continue
+        try:
+            # Debug log the fixtures
+            logger.debug(f"Processing {len(fixtures)} fixtures")
             
+            # Sort and filter fixtures
+            valid_fixtures = []
+            for fixture in fixtures:
                 try:
-                    logger.info(f"Processing league ID: {league_id} - {league_info['name']}")
-                    # Fetch standings and fixtures
-                    standings = api.fetch_standings(league_id)
-                    if not standings or not standings.get('response'):
-                        logger.warning(f"No standings data found for league ID: {league_id}")
+                    if not isinstance(fixture, dict):
+                        logger.debug(f"Invalid fixture format: {type(fixture)}")
+                        continue
+                        
+                    fixture_date = fixture.get('fixture', {}).get('date')
+                    if not fixture_date:
+                        logger.debug("Fixture missing date")
+                        continue
+                        
+                    valid_fixtures.append(fixture)
+                except Exception as e:
+                    logger.debug(f"Error processing fixture: {str(e)}")
+                    continue
+
+            sorted_fixtures = sorted(
+                valid_fixtures,
+                key=lambda x: x['fixture']['date'],
+                reverse=True
+            )
+
+            # Process matches
+            form = []
+            points = 0
+            goals_for = 0
+            goals_against = 0
+            matches_analyzed = 0
+
+            for match in sorted_fixtures:
+                try:
+                    # Skip if not finished
+                    status = match.get('fixture', {}).get('status', {}).get('short')
+                    if status != 'FT':
+                        logger.debug(f"Skipping match with status: {status}")
                         continue
 
-                    standings_data = standings['response'][0]['league']['standings'][0]
-                    fixtures = api.fetch_fixtures(league_id)
-                    logger.info(f"Fixtures fetched for league ID: {league_id}, Count: {len(fixtures)}")
+                    # Get team data safely
+                    teams = match.get('teams', {})
+                    home_team = teams.get('home', {})
+                    away_team = teams.get('away', {})
+                    
+                    if not home_team or not away_team:
+                        logger.debug("Missing team data in match")
+                        continue
+                        
+                    # Validate team identification
+                    if team_id not in [home_team.get('id'), away_team.get('id')]:
+                        logger.debug(f"Match does not involve team {team_id}")
+                        continue
+                        
+                    logger.debug(f"""
+                        Match teams:
+                        Home: {home_team.get('name')} (ID: {home_team.get('id')})
+                        Away: {away_team.get('name')} (ID: {away_team.get('id')})
+                    """)
 
-                    # Analyze each team in the league
-                    for team in standings_data:
-                        team_id = team['team']['id']
-                        form_data = FormAnalyzer.analyze_team_form(fixtures, team_id, matches_count)
-                        if form_data['matches_analyzed'] == matches_count:
-                            form_analysis.append({
-                                'team': team['team']['name'],
-                                'league': league_info['name'],
-                                'form': ' '.join(form_data['form']),
-                                'points': form_data['points'],
-                            })
+                    # Get goals safely
+                    goals = match.get('goals', {})
+                    home_goals = goals.get('home')
+                    away_goals = goals.get('away')
+                    
+                    if home_goals is None or away_goals is None:
+                        logger.debug("Missing goals data in match")
+                        continue
+
+                    # Convert goals to int with explicit error handling
+                    try:
+                        home_goals = int(home_goals)
+                        away_goals = int(away_goals)
+                    except (ValueError, TypeError) as e:
+                        logger.debug(f"Error converting goals to int: {str(e)}")
+                        continue
+
+                    # Determine if team was home or away
+                    is_home = home_team.get('id') == team_id
+                    team_goals = home_goals if is_home else away_goals
+                    opponent_goals = away_goals if is_home else home_goals
+                    opponent_name = (away_team if is_home else home_team).get('name', 'Unknown')
+
+                    # Debug logging for match analysis
+                    logger.debug(f"""
+                        Analyzing match:
+                        Team: {team_id} {'(Home)' if is_home else '(Away)'}
+                        Opponent: {opponent_name}
+                        Score: {home_goals}-{away_goals}
+                        Team goals: {team_goals}
+                        Opponent goals: {opponent_goals}
+                        Teams data: {teams}
+                        Match date: {match.get('fixture', {}).get('date')}
+                    """)
+
+                    # Calculate result
+                    if team_goals > opponent_goals:
+                        form.append('W')
+                        points += 3
+                        logger.debug(f"Result: Win against {opponent_name}")
+                    elif team_goals < opponent_goals:
+                        form.append('L')
+                        logger.debug(f"Result: Loss against {opponent_name}")
+                    else:
+                        form.append('D')
+                        points += 1
+                        logger.debug(f"Result: Draw against {opponent_name}")
+
+                    goals_for += team_goals
+                    goals_against += opponent_goals
+                    matches_analyzed += 1
+
+                    if matches_analyzed >= matches_count:
+                        break
 
                 except Exception as e:
-                    logger.error(f"Error processing league {league_id}: {str(e)}", exc_info=True)
+                    logger.debug(f"Error analyzing match: {str(e)}")
                     continue
 
-        logger.info(f"Finished analysis for ALL_LEAGUES at {datetime.now()}, Total Teams Analyzed: {len(form_analysis)}")
-        return form_analysis
+            # Pad form if needed
+            while len(form) < matches_count:
+                form.append('U')
 
+            result = {
+                'form': form,
+                'points': points,
+                'matches_analyzed': matches_analyzed,
+                'goals_for': goals_for,
+                'goals_against': goals_against
+            }
+            
+            logger.debug(f"Form analysis result: {result}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in form analysis: {str(e)}")
+            return FormAnalyzer._get_default_form(matches_count)
 
     @staticmethod
+    def _get_default_form(matches_count):
+        """Get default form data"""
+        return {
+            'form': ['U'] * matches_count,
+            'points': 0,
+            'matches_analyzed': 0,
+            'goals_for': 0,
+            'goals_against': 0
+        }
+        
+    @staticmethod
     def get_upcoming_opponents(fixtures, team_id, top_n=5):
-        """Get the next N opponents for a team."""
-        upcoming_matches = []
+        """
+        Get upcoming opponents for a team from fixtures
+        
+        Args:
+            fixtures: List of fixture data
+            team_id: ID of the team to analyze
+            top_n: Number of upcoming matches to analyze
+            
+        Returns:
+            list: List of upcoming opponent details
+        """
+        logger.debug(f"Getting upcoming opponents for team {team_id}, top_n={top_n}")
+        
+        if not fixtures or not team_id:
+            logger.debug("No fixtures or team_id provided")
+            return []
 
-        # Sort fixtures by date
-        sorted_fixtures = sorted(
-            fixtures,
-            key=lambda x: datetime.strptime(x['fixture']['date'], '%Y-%m-%dT%H:%M:%S%z')
-        )
-
-        # Get upcoming matches
-        for fixture in sorted_fixtures:
-            if fixture['fixture']['status']['short'] != 'NS':  # Only get not started matches
-                continue
-
-            home_team = fixture['teams']['home']
-            away_team = fixture['teams']['away']
-
-            if home_team['id'] == team_id or away_team['id'] == team_id:
-                opponent = away_team if home_team['id'] == team_id else home_team
-                match_date = datetime.strptime(fixture['fixture']['date'], '%Y-%m-%dT%H:%M:%S%z')
-
-                upcoming_matches.append({
-                    'date': match_date.strftime('%Y-%m-%d'),
-                    'time': match_date.strftime('%H:%M'),
-                    'opponent': opponent['name'],
-                    'is_home': home_team['id'] == team_id,
-                    'venue': fixture['fixture']['venue']['name']
-                })
-
-                if len(upcoming_matches) >= top_n:
-                    break
-
-        return upcoming_matches
+        try:
+            # Filter and sort upcoming matches
+            upcoming = []
+            for fixture in fixtures:
+                try:
+                    if not isinstance(fixture, dict):
+                        continue
+                        
+                    # Get fixture status
+                    status = fixture.get('fixture', {}).get('status', {}).get('short')
+                    if status in ['FT', 'AET', 'PEN']:  # Skip finished matches
+                        continue
+                        
+                    # Get teams data
+                    teams = fixture.get('teams', {})
+                    home_team = teams.get('home', {})
+                    away_team = teams.get('away', {})
+                    
+                    if not home_team or not away_team:
+                        continue
+                        
+                    # Check if our team is involved
+                    if team_id not in [home_team.get('id'), away_team.get('id')]:
+                        continue
+                        
+                    # Get opponent details
+                    is_home = home_team.get('id') == team_id
+                    opponent = away_team if is_home else home_team
+                    
+                    # Get fixture date
+                    fixture_date = fixture.get('fixture', {}).get('date')
+                    if not fixture_date:
+                        continue
+                        
+                    # Extract time from the fixture date
+                    try:
+                        fixture_datetime = datetime.fromisoformat(fixture_date.replace('Z', '+00:00'))
+                        match_time = fixture_datetime.strftime('%H:%M')
+                    except Exception as e:
+                        logger.debug(f"Error parsing fixture date: {str(e)}")
+                        match_time = "TBD"
+                        
+                    match_details = {
+                        'opponent_id': opponent.get('id'),
+                        'opponent': opponent.get('name', 'Unknown'),
+                        'is_home': is_home,
+                        'date': fixture_date,
+                        'time': match_time,
+                        'fixture_id': fixture.get('fixture', {}).get('id'),
+                        'league': fixture.get('league', {}).get('name', 'Unknown'),
+                        'round': fixture.get('league', {}).get('round', 'Unknown'),
+                        'venue': fixture.get('fixture', {}).get('venue', {}).get('name', 'Unknown'),
+                        'timestamp': fixture.get('fixture', {}).get('timestamp', 0),
+                        'status': fixture.get('fixture', {}).get('status', {}).get('long', 'Not Started')
+                    }
+                    
+                    upcoming.append((fixture_date, match_details))
+                    
+                except Exception as e:
+                    logger.debug(f"Error processing fixture: {str(e)}")
+                    continue
+                    
+            # Sort by date and get the next matches
+            upcoming.sort(key=lambda x: x[0])
+            return [match[1] for match in upcoming[:top_n]]
+            
+        except Exception as e:
+            logger.error(f"Error getting upcoming opponents: {str(e)}")
+            return []

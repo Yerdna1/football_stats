@@ -3,3 +3,4 @@ plotly
 pandas
 gunicorn
 requests  # Assuming FootballAPI relies on requests
+python-redis

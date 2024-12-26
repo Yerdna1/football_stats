@@ -1,7 +1,150 @@
+from collections import defaultdict
+from datetime import datetime
 from venv import logger
 
 
 class FixtureAnalyzer:
+    @staticmethod
+    def group_fixtures_by_date(fixtures, rows_per_group=20):
+        """
+        Group fixtures by date and format them for display
+        
+        Args:
+            fixtures: List of fixture data
+            rows_per_group: Number of rows to show per date group
+            
+        Returns:
+            dict: Fixtures grouped by date
+        """
+        try:
+            # Group fixtures by date
+            grouped_fixtures = defaultdict(list)
+            
+            for fixture in fixtures:
+                try:
+                    # Get fixture date
+                    fixture_data = fixture.get('fixture', {})
+                    date_str = fixture_data.get('date')
+                    
+                    if not date_str:
+                        logger.debug("Missing date in fixture")
+                        continue
+                        
+                    # Parse and format date
+                    date_obj = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    date_key = date_obj.strftime('%Y-%m-%d')  # Group by day
+                    
+                    # Get team names
+                    teams = fixture.get('teams', {})
+                    home_team = teams.get('home', {}).get('name', 'Unknown')
+                    away_team = teams.get('away', {}).get('name', 'Unknown')
+                    
+                    # Get league info
+                    league = fixture.get('league', {})
+                    league_name = league.get('name', 'Unknown')
+                    round_name = league.get('round', '')
+                    
+                    # Get venue
+                    venue = fixture_data.get('venue', {}).get('name', 'TBD')
+                    
+                    # Get match time
+                    match_time = date_obj.strftime('%H:%M')
+                    
+                    # Get match status
+                    status = fixture_data.get('status', {})
+                    status_short = status.get('short', 'NS')
+                    status_long = status.get('long', 'Not Started')
+                    
+                    # Get scores if available
+                    goals = fixture.get('goals', {})
+                    home_goals = goals.get('home', '-')
+                    away_goals = goals.get('away', '-')
+                    score = f"{home_goals}-{away_goals}" if status_short in ['FT', 'AET', 'PEN'] else '-'
+                    
+                    fixture_info = {
+                        'fixture_id': fixture_data.get('id'),
+                        'date': date_key,
+                        'time': match_time,
+                        'home_team': home_team,
+                        'away_team': away_team,
+                        'score': score,
+                        'status': status_long,
+                        'status_short': status_short,
+                        'league': league_name,
+                        'round': round_name,
+                        'venue': venue
+                    }
+                    
+                    grouped_fixtures[date_key].append(fixture_info)
+                
+                except Exception as e:
+                    logger.debug(f"Error processing fixture: {str(e)}")
+                    continue
+            
+            # Sort fixtures within each date
+            for date_key in grouped_fixtures:
+                grouped_fixtures[date_key].sort(key=lambda x: x['time'])
+                # Limit rows if needed
+                if len(grouped_fixtures[date_key]) > rows_per_group:
+                    grouped_fixtures[date_key] = grouped_fixtures[date_key][:rows_per_group]
+            
+            # Sort dates
+            sorted_dates = sorted(grouped_fixtures.keys())
+            
+            return {
+                date: grouped_fixtures[date]
+                for date in sorted_dates
+            }
+            
+        except Exception as e:
+            logger.error(f"Error grouping fixtures: {str(e)}")
+            return {}
+
+    @staticmethod
+    def format_fixture_groups_for_display(grouped_fixtures):
+        """
+        Format grouped fixtures for display
+        
+        Args:
+            grouped_fixtures: Dictionary of fixtures grouped by date
+            
+        Returns:
+            list: List of tables, one for each date
+        """
+        formatted_groups = []
+        
+        for date, fixtures in grouped_fixtures.items():
+            try:
+                date_obj = datetime.strptime(date, '%Y-%m-%d')
+                date_header = date_obj.strftime('%A, %B %d, %Y')
+                
+                group_data = {
+                    'date': date_header,
+                    'fixtures': []
+                }
+                
+                for fixture in fixtures:
+                    match_data = {
+                        'Time': fixture['time'],
+                        'League': fixture['league'],
+                        'Home': fixture['home_team'],
+                        'Score': fixture['score'],
+                        'Away': fixture['away_team'],
+                        'Status': fixture['status'],
+                        'Venue': fixture['venue']
+                    }
+                    group_data['fixtures'].append(match_data)
+                
+                formatted_groups.append(group_data)
+                
+            except Exception as e:
+                logger.error(f"Error formatting fixture group for {date}: {str(e)}")
+                continue
+        
+        return formatted_groups
+    
+    
+    
     @staticmethod
     def safe_get_value(data, *keys, default=0):
         """Safely navigate nested dictionaries and handle type conversion"""

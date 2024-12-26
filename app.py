@@ -9,7 +9,7 @@ from sport_callbacks import (
     setup_next_fixtures_callbacks,
     setup_league_stats_callbacks,
     setup_form_analysis_callbacks,
-    setup_usage_api_callbacks
+   
     )
 from sport_layouts import (
     create_winless_streaks_tab,
@@ -53,25 +53,7 @@ class DashboardApp:
                 create_league_stats_tab(),
                 create_form_analysis_tab()
             ]),
-            # API Usage display at bottom
-            html.Div([
-                html.Span("API Usage: ", style={'fontWeight': 'bold'}),
-                html.Span(id='api-usage-display'),
-                dcc.Interval(
-                    id='interval-component',
-                    interval=30*1000,
-                    n_intervals=0
-                )
-            ], style={
-                'position': 'fixed',
-                'bottom': '10px',
-                'right': '10px',
-                'padding': '5px 10px',
-                'backgroundColor': '#f8f9fa',
-                'borderRadius': '5px',
-                'boxShadow': '0 -2px 5px rgba(0,0,0,0.1)',
-                'zIndex': '1000'
-            })
+         
         ])
         
     def setup_callbacks(self):
@@ -81,7 +63,7 @@ class DashboardApp:
         setup_next_fixtures_callbacks(self.app, self.api)
         setup_league_stats_callbacks(self.app, self.api)  # Corrected: no comma
         setup_form_analysis_callbacks(self.app, self.api)
-        setup_usage_api_callbacks(self.app,self.api)
+    
     
     def run(self, debug=True):
         # Run the Dash app
