@@ -11,6 +11,7 @@ from sport_callbacks import (
     setup_form_analysis_callbacks,
    
     )
+from sport_callbacks.team_analysis_callback import add_stats_callback
 from sport_layouts import (
     create_winless_streaks_tab,
     create_team_analysis_tab,
@@ -27,7 +28,9 @@ logger = logging.getLogger(__name__)
 class DashboardApp:
     def __init__(self, api):
         # Initialize the Dash app
-        self.app = dash.Dash(__name__)
+        self.app = dash.Dash(__name__, external_stylesheets=[
+        'https://codepen.io/chriddyp/pen/bWLwgP.css'
+        ])
         self.server = self.app.server  # Expose the Flask server for Gunicorn
         self.api = api
         self.setup_layout()
@@ -63,6 +66,7 @@ class DashboardApp:
         setup_next_fixtures_callbacks(self.app, self.api)
         setup_league_stats_callbacks(self.app, self.api)  # Corrected: no comma
         setup_form_analysis_callbacks(self.app, self.api)
+        add_stats_callback(self.app, self.api)
     
     
     def run(self, debug=True):

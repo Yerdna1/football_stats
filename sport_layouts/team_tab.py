@@ -73,8 +73,45 @@ def create_team_analysis_tab():
             children=[
                 html.Div([
                     create_team_results_section(),
-                    create_scoreless_teams_section()
+                    create_scoreless_teams_section(),
+                    create_15min_cards_and_15min_goals_section(),
+                    create_additional_stats_section()
                 ])
             ]
         )
+    ])
+
+def create_15min_cards_and_15min_goals_section():
+    return html.Div([
+            html.H1("Time Analysis Dashboard"),
+            
+        
+            
+            dcc.Graph(id='goals-time-chart'),
+            dcc.Graph(id='cards-time-chart')
+    ])
+    
+def create_additional_stats_section():
+    return html.Div([
+        html.H3("Additional Statistics", style={'textAlign': 'center'}),
+        
+        # Streaks and Results
+        html.Div([
+            html.Div([
+                html.H4("Streaks & Results"),
+                html.Div(id='streaks-results-stats')
+            ], className='six columns'),
+            
+            # Clean Sheets and Scoring
+            html.Div([
+                html.H4("Clean Sheets & Scoring"),
+                html.Div(id='clean-sheets-stats')
+            ], className='six columns'),
+        ], className='row'),
+        
+        # Formations
+        html.Div([
+            html.H4("Formations Used"),
+            dcc.Graph(id='formations-pie')
+        ], style={'marginTop': '20px'})
     ])
