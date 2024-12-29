@@ -1,4 +1,5 @@
 from dash import html, dcc, dash_table
+
 from config import LEAGUE_NAMES
 from .utils import create_league_options
 from .styles import table_cell_style, table_header_style, table_style
@@ -53,12 +54,9 @@ def create_form_analysis_tab():
             )
         ], style={'width': '80%', 'margin': '20px auto'}),
 
-        # Tables section
-        dcc.Loading(
-            id="form-loading",
-            children=[
+    
                 # Form Analysis Table
-                html.Div([
+        html.Div([
                     html.H2("Form vs Actual Performance Analysis",
                             style={'text-align': 'center', 'margin': '20px 0'}),
                     dash_table.DataTable(
@@ -72,7 +70,8 @@ def create_form_analysis_tab():
                             {'name': 'Recent Form', 'id': 'form', 'presentation': 'markdown'},
                             {'name': 'Form Points', 'id': 'form_points'},
                             {'name': 'Form PPG', 'id': 'form_ppg'},
-                            {'name': 'Performance Difference', 'id': 'performance_diff'}
+                            {'name': 'Performance Difference', 'id': 'performance_diff'},
+                            {'name': 'Injured Players', 'id': 'injured_players'}
                         ],
                         style_cell=table_cell_style,
                         style_header=table_header_style,
@@ -90,9 +89,135 @@ def create_form_analysis_tab():
                                 'color': 'red',
                                 'fontWeight': 'bold'
                             },
+                            {
+                                'if': {'column_id': 'injured_players'},
+                                'color': 'red'
+                            }
                         ]
                     )
-                ]),
+                ,
+                
+             # Squad Statistics section
+        html.Div([
+            html.H2("Squad Statistics Analysis",
+                    style={'text-align': 'center', 'margin': '20px 0'}),
+            
+             # Add team selector
+            html.Div([
+                html.Label('Select Team',
+                          style={'display': 'block', 'margin-bottom': '5px', 'text-align': 'center'}),
+                dcc.Dropdown(
+                    id='team-selector-dropdown',
+                    placeholder='Select a team to view statistics',
+                    style={'width': '100%', 'margin-bottom': '20px'}
+                )
+            ], style={'width': '80%', 'margin': '20px auto'}),
+            
+            # Stats type selector
+            dcc.RadioItems(
+                id='stats-type-selector',
+                options=[
+                    {'label': 'Basic Statistics', 'value': 'basic'},
+                    {'label': 'Advanced Statistics', 'value': 'advanced'}
+                ],
+                value='basic',
+                style={'textAlign': 'center', 'margin': '10px 0'},
+                inline=True
+            ),
+
+            # Basic stats table container
+            html.Div(
+                id='basic-stats-container',
+                children=[
+                    dash_table.DataTable(
+                        id='player-stats-table',
+                        columns=[
+                            {'name': 'Player', 'id': 'name'},
+                            {'name': 'Position', 'id': 'position'},
+                            {'name': 'Age', 'id': 'age'},
+                            {'name': 'Apps', 'id': 'appearances'},
+                            {'name': 'Minutes', 'id': 'minutes'},
+                            {'name': 'Goals', 'id': 'goals'},
+                            {'name': 'Assists', 'id': 'assists'},
+                            {'name': 'Rating', 'id': 'rating'},
+                            {'name': 'Yellow', 'id': 'yellow_cards'},
+                            {'name': 'Red', 'id': 'red_cards'}
+                        ],
+                        data=[],
+                        style_data={
+                            'whiteSpace': 'normal',
+                            'height': 'auto',
+                            'textAlign': 'center'
+                        },
+                        style_cell={
+                            'textAlign': 'center',
+                            'padding': '10px',
+                            'font-family': 'Arial, sans-serif'
+                        },
+                        style_header={
+                            'backgroundColor': 'rgb(230, 230, 230)',
+                            'fontWeight': 'bold'
+                        },
+                        style_table={
+                            'overflowX': 'auto',
+                            'width': '95%',
+                            'margin': '0 auto'
+                        },
+                        page_size=20,
+                        sort_action='native',
+                        filter_action='native'
+                    )
+                ],
+                style={'display': 'block'}
+            ),
+
+            # Advanced stats table container
+            html.Div(
+                id='advanced-stats-container',
+                children=[
+                    dash_table.DataTable(
+                        id='advanced-stats-table',
+                        columns=[
+                            {'name': 'Player', 'id': 'name'},
+                            {'name': 'Position', 'id': 'position'},
+                            {'name': 'Shots Total', 'id': 'shots_total'},
+                            {'name': 'Shots On', 'id': 'shots_on'},
+                            {'name': 'Pass %', 'id': 'passes_accuracy'},
+                            {'name': 'Key Passes', 'id': 'passes_key'},
+                            {'name': 'Tackles', 'id': 'tackles'},
+                            {'name': 'Intercept.', 'id': 'interceptions'},
+                            {'name': 'Dribbles (S/A)', 'id': 'dribbles_success'},
+                            {'name': 'Fouls Drawn', 'id': 'fouls_drawn'}
+                        ],
+                        data=[],
+                        style_data={
+                            'whiteSpace': 'normal',
+                            'height': 'auto',
+                            'textAlign': 'center'
+                        },
+                        style_cell={
+                            'textAlign': 'center',
+                            'padding': '10px',
+                            'font-family': 'Arial, sans-serif'
+                        },
+                        style_header={
+                            'backgroundColor': 'rgb(230, 230, 230)',
+                            'fontWeight': 'bold'
+                        },
+                        style_table={
+                            'overflowX': 'auto',
+                            'width': '95%',
+                            'margin': '0 auto'
+                        },
+                        page_size=20,
+                        sort_action='native',
+                        filter_action='native'
+                    )
+                ],
+                style={'display': 'none'}
+            )
+        ], style={'margin': '20px 0'})
+        ,
 
                 # Upcoming Fixtures Table
                 html.Div([
