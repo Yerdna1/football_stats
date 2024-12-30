@@ -72,12 +72,14 @@ class DashboardApp:
     def run(self, debug=True):
         # Run the Dash app
         self.app.run_server(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    
+    
+# Create the dashboard app
+football_api = FootballAPI(API_KEY, BASE_URL)
+dashboard = DashboardApp(football_api)
+app = dashboard.server  # This is what gunicorn will use
 
 if __name__ == '__main__':
-    # Instantiate the API and app
-    football_api = FootballAPI(API_KEY, BASE_URL)
-    dashboard = DashboardApp(football_api)
-    server = dashboard.server  # This is important for Render
     if os.environ.get('RENDER'):
         dashboard.run(debug=False)
     else:
