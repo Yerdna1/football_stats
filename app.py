@@ -9,17 +9,28 @@ from sport_callbacks import (
     setup_next_fixtures_callbacks,
     setup_league_stats_callbacks,
     setup_form_analysis_callbacks,
+    setup_firebase_analysis_callbacks
    
     )
+
+from sport_callbacks.fixtures_tab_data_collection_callback import setup_data_collection_callbacks
 from sport_callbacks.team_analysis_callback import add_stats_callback
 from sport_layouts import (
     create_winless_streaks_tab,
     create_team_analysis_tab,
     create_next_round_tab,
     create_league_stats_tab,
-    create_form_analysis_tab
+    create_form_analysis_tab,
+    create_firebase_analysis_tab,
 )
 from config import ALL_LEAGUES, API_KEY, BASE_URL, LEAGUE_NAMES
+from sport_layouts.fixtures_tab_firestore import create_data_collection_tab
+from firebase_config import initialize_firebase
+
+# Initialize Firebase at app startup
+db = initialize_firebase()
+if not db:
+    raise Exception("Failed to initialize Firebase")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -54,7 +65,9 @@ class DashboardApp:
                 create_team_analysis_tab(),
                 create_next_round_tab(),
                 create_league_stats_tab(),
-                create_form_analysis_tab()
+                create_form_analysis_tab(),
+                create_data_collection_tab(),
+                create_firebase_analysis_tab(),
             ]),
          
         ])
@@ -64,9 +77,11 @@ class DashboardApp:
         setup_winless_streaks_callbacks(self.app, self.api)
         setup_team_analysis_callbacks(self.app, self.api)
         setup_next_fixtures_callbacks(self.app, self.api)
-        setup_league_stats_callbacks(self.app, self.api)  # Corrected: no comma
+        setup_league_stats_callbacks(self.app, self.api)  
         setup_form_analysis_callbacks(self.app, self.api)
         add_stats_callback(self.app, self.api)
+        setup_data_collection_callbacks(self.app, self.api)
+        setup_firebase_analysis_callbacks(self.app,db)
     
     
     def run(self, debug=True):

@@ -71,6 +71,40 @@ class FootballAPI:
                 continue
                 
         return results
+    
+    
+    async def get_countries(self):
+        """Get list of available countries"""
+        response = await self._make_request('/countries')
+        return response.get('response', [])
+
+    async def get_leagues(self, country=None):
+        """Get leagues for a country"""
+        params = {'country': country} if country else {}
+        response = await self._make_request('/leagues', params)
+        return response.get('response', [])
+
+    async def get_seasons(self, league_id):
+        """Get available seasons for a league"""
+        response = await self._make_request(f'/leagues/seasons')
+        return response.get('response', [])
+
+    async def get_fixtures(self, league_id, season, status=None):
+        """Get fixtures for a league and season"""
+        params = {
+            'league': league_id,
+            'season': season
+        }
+        if status:
+            params['status'] = status
+        response = await self._make_request('/fixtures', params)
+        return response.get('response', [])
+
+    async def get_fixtures_by_ids(self, ids):
+        """Get detailed fixtures data by IDs"""
+        response = await self._make_request(f'/fixtures', {'ids': ids})
+        return response.get('response', [])
+    
     def fetch_all_teams(self, league_names, matches_count=3):
         """
         Fetch all teams across all leagues with form analysis
