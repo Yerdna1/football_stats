@@ -1,5 +1,11 @@
-API_KEY = '2061b15078fc8e299dd268fb5a066f34'
-BASE_URL = 'https://v3.football.api-sports.io'
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
+
+API_KEY = os.getenv('FOOTBALL_API_KEY')  # Instead of hardcoding
+BASE_URL = os.getenv('BASE_URL')
+
 ALL_LEAGUES = -1  # Special value for all leagues
 PERF_DIFF_THRESHOLD = 0.6
 
