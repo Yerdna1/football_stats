@@ -1,6 +1,33 @@
 from dash import dcc, html  # Add both dash components
 # If you need more specific components, you can import them like:
 # from dash.dependencies import Input, Output, State
+def create_selection_row(index):
+    return html.Div([
+        html.Div([
+            html.Label('Country'),
+            dcc.Dropdown(
+                id={'type': 'country-selector', 'index': index},
+                placeholder='Select country...'
+            )
+        ], className='four columns'),
+        html.Div([
+            html.Label('League'),
+            dcc.Dropdown(
+                id={'type': 'league-selector', 'index': index},
+                placeholder='Select league...',
+            )
+        ], className='four columns'),
+        html.Div([
+            html.Label('Season'),
+            dcc.Dropdown(
+                id={'type': 'season-selector', 'index': index},
+                placeholder='Select season...',
+                value='2024',
+            )
+        ], className='four columns'),
+    ], className='row selection-row', id={'type': 'selection-row', 'index': index})
+
+
 def create_data_collection_tab():
     return dcc.Tab(
         label='Data Collection',
@@ -8,45 +35,35 @@ def create_data_collection_tab():
         children=[
             # Status store and interval
             dcc.Store(id='status-store'),
+            dcc.Store(id='rows-store', data={'num_rows': 1}),
             dcc.Interval(
                 id='interval-component',
                 interval=1*1000,  # 1 second refresh
                 n_intervals=0
             ),
             html.Div([
-                # Selectors row
+                # Container for selection rows
+                html.Div(id='selection-rows-container', children=[
+                    create_selection_row(0)
+                ]),
+                
+                # Add Row Button
                 html.Div([
-                    html.Div([
-                        html.Label('Country'),
-                        dcc.Dropdown(
-                            id='country-selector',
-                            placeholder='Select country...'
-                        )
-                    ], className='four columns'),
-                    html.Div([
-                        html.Label('League'),
-                        dcc.Dropdown(
-                            id='league-selector',
-                            placeholder='Select league...',
-                        )
-                    ], className='four columns'),
-                    html.Div([
-                        html.Label('Season'),
-                        dcc.Dropdown(
-                            id='season-selector',
-                            placeholder='Select season...',
-                            value='2024',
-                            disabled='True'
-                        )
-                    ], className='four columns'),
-                ], className='row'),
+                    html.Button(
+                        '+ Add Selection',
+                        id='add-row-button',
+                        className='button',
+                        style={'marginTop': '10px'}
+                    ),
+                ], style={'textAlign': 'right'}),
 
                 # Collection controls
                 html.Div([
                     html.Button(
                         'Collect Fixtures Data from API and store to Firestore',
                         id='collect-data-button',
-                        className='button-primary'
+                        className='button-primary',
+                        disabled=True
                     ),
                 ], style={'margin-top': '20px'}),
 
