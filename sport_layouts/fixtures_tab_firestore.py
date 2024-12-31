@@ -35,6 +35,8 @@ def create_data_collection_tab():
                         dcc.Dropdown(
                             id='season-selector',
                             placeholder='Select season...',
+                            value='2024',
+                            disabled='True'
                         )
                     ], className='four columns'),
                 ], className='row'),
@@ -42,7 +44,7 @@ def create_data_collection_tab():
                 # Collection controls
                 html.Div([
                     html.Button(
-                        'Collect Fixtures Data',
+                        'Collect Fixtures Data from API and store to Firestore',
                         id='collect-data-button',
                         className='button-primary'
                     ),
