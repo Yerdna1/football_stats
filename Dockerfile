@@ -15,4 +15,4 @@ COPY . .
 EXPOSE 8080
 
 # Command to run the app with Gunicorn
-CMD ["gunicorn", "-b", "0.0.0.0:8080", "app:server"]
+CMD ["gunicorn", "-b", "0.0.0.0:8080", "app:app"]
