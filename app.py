@@ -46,6 +46,7 @@ class DashboardApp:
         self.api = api
         self.setup_layout()
         self.setup_callbacks()
+        
 
     @staticmethod
     def get_league_display_name(league_id):
