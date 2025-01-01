@@ -48,6 +48,8 @@ class DashboardApp:
         self.setup_callbacks()
         
 
+
+
     @staticmethod
     def get_league_display_name(league_id):
         """Get formatted league name with flag for display"""
