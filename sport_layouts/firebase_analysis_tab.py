@@ -37,6 +37,12 @@ def create_firebase_analysis_tab():
                 html.Div([
                     html.H2("Player Statistics", className='text-2xl font-bold mb-4'),
                     html.Div(id='player-stats-container')
+                ], className='mb-8'),
+                
+                # Team Statistics Section
+                html.Div([
+                    html.H2("Team Statistics", className='text-2xl font-bold mb-4'),
+                    html.Div(id='team-stats-container')
                 ])
             ], className='p-4')
         ]

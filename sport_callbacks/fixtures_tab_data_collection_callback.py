@@ -1,5 +1,7 @@
+
 from dash import html, dcc, ctx
-from dash.dependencies import Input, Output, State
+import dash
+from dash.dependencies import Input, Output, State, ALL
 import json
 from datetime import datetime
 import firebase_admin
@@ -125,9 +127,6 @@ def process_collection(api, league_id, season):
         total_fixtures = len(fixtures)
         add_log(f"Found {total_fixtures} fixtures to process")
         
-        db = firestore.client()
-        add_log("Connected to Firebase database")
-        
         chunk_size = 20
         chunks = [fixtures[i:i + chunk_size] for i in range(0, len(fixtures), chunk_size)]
         total_processed = 0
@@ -137,7 +136,21 @@ def process_collection(api, league_id, season):
             batch = db.batch()
             
             for fixture in chunk:
-                fixture_id = fixture['fixture']['id']
+                fixture_id = str(fixture['fixture']['id'])
+                
+                # Check if fixture exists and when it was last updated
+                doc_ref = db.collection('fixtures').document(fixture_id)
+                doc = doc_ref.get()
+                
+                if doc.exists:
+                    fixture_data = doc.to_dict()
+                    fixture_date = fixture['fixture']['date']
+                    stored_date = fixture_data.get('fixture', {}).get('date')
+                    
+                    if fixture_date == stored_date:
+                        add_log(f"Skipping fixture {fixture_id} - already up to date")
+                        continue
+                
                 home_team = fixture['teams']['home']['name']
                 away_team = fixture['teams']['away']['name']
                 
@@ -157,23 +170,13 @@ def process_collection(api, league_id, season):
                     'updated_at': firestore.SERVER_TIMESTAMP
                 }
                 
-                if details.get('events'):
-                    add_log(f"- Collected {len(details['events'])} events")
-                if details.get('lineups'):
-                    add_log(f"- Collected {len(details['lineups'])} lineups")
-                if details.get('statistics'):
-                    add_log(f"- Collected statistics")
-                if details.get('players'):
-                    total_players = sum(len(team_players) for team_players in details['players'])
-                    add_log(f"- Collected data for {total_players} players")
-                
-                fixture_ref = db.collection('fixtures').document(str(fixture_id))
-                batch.set(fixture_ref, fixture_data)
+                batch.set(doc_ref, fixture_data)
+                total_processed += 1
             
-            batch.commit()
-            add_log(f"Committed batch {i+1} of {len(chunks)}")
+            if total_processed > 0:
+                batch.commit()
+                add_log(f"Committed batch {i+1} of {len(chunks)}")
             
-            total_processed += len(chunk)
             progress = (total_processed / total_fixtures) * 100
             global_state.current_progress = f"Progress: {progress:.1f}% ({total_processed}/{total_fixtures})"
 
@@ -188,10 +191,31 @@ def process_collection(api, league_id, season):
 
 def setup_data_collection_callbacks(app, api):
     @app.callback(
-        Output('country-selector', 'options'),
-        Input('country-selector', 'search_value')
+        [Output('selection-rows-container', 'children'),
+         Output('rows-store', 'data'),
+         Output('add-row-button', 'disabled')],
+        Input('add-row-button', 'n_clicks'),
+        State('rows-store', 'data')
     )
-    def update_countries(search_value):
+    def add_selection_row(n_clicks, rows_data):
+        if not n_clicks:
+            raise PreventUpdate
+            
+        num_rows = rows_data['num_rows']
+        if num_rows >= 5:
+            return dash.no_update, dash.no_update, True
+            
+        new_row = create_selection_row(num_rows)
+        existing_rows = [create_selection_row(i) for i in range(num_rows)]
+        rows_data['num_rows'] = num_rows + 1
+        
+        return existing_rows + [new_row], rows_data, num_rows + 1 >= 5
+    
+    @app.callback(
+        Output({'type': 'country-selector', 'index': ALL}, 'options'),
+        Input({'type': 'country-selector', 'index': ALL}, 'search_value')
+    )
+    def update_countries(search_values):
         try:
             data = make_api_request(
                 f"{api.base_url}/countries",
@@ -204,47 +228,55 @@ def setup_data_collection_callbacks(app, api):
                      'value': country['name']} 
                     for country in countries
                 ]
-                logger.info(f"Retrieved {len(options)} countries")
-                return options
-            return []
+                return [options] * len(search_values)
+            return [[]] * len(search_values)
         except Exception as e:
             logger.error(f"Error in update_countries: {e}")
-            return []
+            return [[]] * len(search_values)
+        
+        
 
     @app.callback(
-        Output('league-selector', 'options'),
-        Input('country-selector', 'value')
+        Output({'type': 'league-selector', 'index': ALL}, 'options'),
+        Input({'type': 'country-selector', 'index': ALL}, 'value')
     )
-    def update_leagues(country):
-        if not country:
-            raise PreventUpdate
-        try:
-            data = make_api_request(
-                f"{api.base_url}/leagues",
-                headers=api.headers,
-                params={'country': country}
-            )
-            if data.get('response'):
-                leagues = data['response']
-                options = [
-                    {'label': f"{league['league']['name']}", 
-                     'value': league['league']['id']} 
-                    for league in leagues
-                ]
-                logger.info(f"Retrieved {len(options)} leagues for {country}")
-                return options
-            return []
-        except Exception as e:
-            logger.error(f"Error in update_leagues: {e}")
-            return []
+    def update_leagues(countries):
+        outputs = []
+        for country in countries:
+            if not country:
+                outputs.append([])
+                continue
+                
+            try:
+                data = make_api_request(
+                    f"{api.base_url}/leagues",
+                    headers=api.headers,
+                    params={'country': country}
+                )
+                if data.get('response'):
+                    leagues = data['response']
+                    options = [
+                        {'label': f"{league['league']['name']}", 
+                         'value': league['league']['id']} 
+                        for league in leagues
+                    ]
+                    outputs.append(options)
+                else:
+                    outputs.append([])
+            except Exception as e:
+                logger.error(f"Error in update_leagues: {e}")
+                outputs.append([])
+        
+        return outputs
+    
+    
+    
 
     @app.callback(
-        Output('season-selector', 'options'),
-        Input('league-selector', 'value')
+        Output({'type': 'season-selector', 'index': ALL}, 'options'),
+        Input({'type': 'league-selector', 'index': ALL}, 'value')
     )
-    def update_seasons(league_id):
-        if not league_id:
-            raise PreventUpdate
+    def update_seasons(league_ids):
         try:
             data = make_api_request(
                 f"{api.base_url}/leagues/seasons",
@@ -256,22 +288,46 @@ def setup_data_collection_callbacks(app, api):
                     {'label': str(season), 'value': season} 
                     for season in sorted(seasons, reverse=True)
                 ]
-                logger.info(f"Retrieved {len(options)} seasons")
-                return options
-            return []
+                return [options] * len(league_ids)
+            return [[]] * len(league_ids)
         except Exception as e:
             logger.error(f"Error in update_seasons: {e}")
-            return []
+            return [[]] * len(league_ids)
+    
+    @app.callback(
+        [Output('collect-data-button', 'disabled'),
+         Output('error-display', 'children')],
+        [Input({'type': 'country-selector', 'index': ALL}, 'value'),
+         Input({'type': 'league-selector', 'index': ALL}, 'value'),
+         Input({'type': 'season-selector', 'index': ALL}, 'value')]
+    )
+    def update_collect_button_state(countries, leagues, seasons):
+        # Enable button only if all dropdowns in all rows have values
+        if not countries or not leagues or not seasons:
+            return True
+        
+        error_message = ""
+        for season in seasons:
+            if season and str(season) != "2024":
+                error_message = "Only season 2024 is allowed!"
+                return True, html.Div(error_message, style={'color': 'red', 'fontWeight': 'bold'})
+            
+        for country, league, season in zip(countries, leagues, seasons):
+            if not country or not league or not season:
+                return True, error_message
+        return False,error_message
+        
+        
 
     @app.callback(
         Output('status-store', 'data'),
         Input('collect-data-button', 'n_clicks'),
-        [State('league-selector', 'value'),
-         State('season-selector', 'value')],
+        [State({'type': 'league-selector', 'index': ALL}, 'value'),
+         State({'type': 'season-selector', 'index': ALL}, 'value')],
         prevent_initial_call=True
     )
-    def start_collection(n_clicks, league_id, season):
-        if not n_clicks or not league_id or not season:
+    def start_collection(n_clicks, league_ids, seasons):
+        if not n_clicks or not league_ids or not seasons:
             raise PreventUpdate
             
         if not global_state.is_running:
@@ -281,14 +337,18 @@ def setup_data_collection_callbacks(app, api):
             global_state.current_error = ""
             global_state.log_messages = []
             
-            # Start collection in a separate thread
-            thread = threading.Thread(
-                target=process_collection,
-                args=(api, league_id, season)
-            )
-            thread.start()
+            # Process each selection in sequence
+            for league_id, season in zip(league_ids, seasons):
+                if league_id and season:  # Only process complete selections
+                    thread = threading.Thread(
+                        target=process_collection,
+                        args=(api, league_id, season)
+                    )
+                    thread.start()
+                    thread.join()  # Wait for each collection to complete before starting next
             
         return {'status': 'started'}
+    
 
     @app.callback(
         [Output('collection-status', 'children'),
