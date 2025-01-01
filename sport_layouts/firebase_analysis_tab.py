@@ -10,6 +10,17 @@ def create_firebase_analysis_tab():
         value='firebase-analysis-tab',
         children=[
             html.Div([
+        dcc.RadioItems(
+            id="data-source-switch",
+            options=[
+                {"label": "Database (DB)", "value": "db"},
+                {"label": "API Calls", "value": "api"},
+            ],
+            value="db",  # Default selection
+        ),
+        dcc.Store(id="selected-data-source", data="db"),  # Hidden store to hold value
+    ]),
+            html.Div([
                 html.Button(
                     'Analyze Data',
                     id='analyze-data-button',

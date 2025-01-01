@@ -5,6 +5,9 @@ load_dotenv()  # Load environment variables from .env file
 
 API_KEY = os.getenv('FOOTBALL_API_KEY')  # Instead of hardcoding
 BASE_URL = os.getenv('BASE_URL')
+CALLS_PER_MINUTE=os.getenv('CALLS_PER_MINUTE')
+
+
 
 ALL_LEAGUES = -1  # Special value for all leagues
 PERF_DIFF_THRESHOLD = 0.6

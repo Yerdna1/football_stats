@@ -208,13 +208,13 @@ def create_player_statistics(fixtures_data):
     return player_stats
 
 def create_player_statistics_table(player_stats):
-    """Create a table with player statistics"""
+    """Create a Pandas DataFrame with player statistics."""
     rows = []
     for player_id, stats in player_stats.items():
         if stats['appearances'] > 0:  # Only show players who played
-            avg_rating = sum(stats['rating'])/len(stats['rating']) if stats['rating'] else 0
-            pass_accuracy = sum(stats['passes_accuracy'])/len(stats['passes_accuracy']) if stats['passes_accuracy'] else 0
-            
+            avg_rating = sum(stats['rating']) / len(stats['rating']) if stats['rating'] else 0
+            pass_accuracy = sum(stats['passes_accuracy']) / len(stats['passes_accuracy']) if stats['passes_accuracy'] else 0
+
             rows.append({
                 'Name': stats['name'],
                 'Team': stats['team'],
@@ -222,28 +222,23 @@ def create_player_statistics_table(player_stats):
                 'Minutes': stats['minutes'],
                 'Goals': stats['goals'],
                 'Assists': stats['assists'],
-                'Rating': f"{avg_rating:.2f}",
+                'Rating': avg_rating,  # Store as numeric for sorting/calculations
                 'Yellow Cards': stats['yellow_cards'],
                 'Red Cards': stats['red_cards'],
                 'Shots': stats['shots_total'],
                 'Shots on Target': stats['shots_on'],
                 'Passes': stats['passes_total'],
-                'Pass Accuracy': f"{pass_accuracy:.1f}%",
+                'Pass Accuracy': pass_accuracy, # Store as numeric for sorting/calculations
                 'Tackles': stats['tackles'],
                 'Interceptions': stats['interceptions'],
-                'Duels Won': f"{(stats['duels_won']/stats['duels_total']*100):.1f}%" if stats['duels_total'] > 0 else "0%"
+                'Duels Won': (stats['duels_won'] / stats['duels_total'] * 100) if stats['duels_total'] > 0 else 0 # Store as numeric
             })
-    
-    return dash_table.DataTable(
-        data=rows,
-        columns=[{'name': col, 'id': col} for col in rows[0].keys()],
-        style_table={'overflowX': 'auto'},
-        style_cell={'textAlign': 'left', 'padding': '10px'},
-        style_header={
-            'backgroundColor': 'rgb(230, 230, 230)',
-            'fontWeight': 'bold'
-        },
-        sort_action='native',
-        filter_action='native',
-        page_size=20
-    )
+
+    df = pd.DataFrame(rows)
+
+    # Format columns for display *after* DataFrame creation
+    df['Rating'] = df['Rating'].apply(lambda x: f"{x:.2f}")
+    df['Pass Accuracy'] = df['Pass Accuracy'].apply(lambda x: f"{x:.1f}%")
+    df['Duels Won'] = df['Duels Won'].apply(lambda x: f"{x:.1f}%")
+
+    return df # Return the Pandas DataFrame

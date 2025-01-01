@@ -11,6 +11,8 @@ from typing import Dict, List, Any
 import logging
 import threading
 
+from config import CALLS_PER_MINUTE
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,7 +28,7 @@ class GlobalState:
 global_state = GlobalState()
 
 class RateLimiter:
-    def __init__(self, calls_per_minute=30):
+    def __init__(self, calls_per_minute=CALLS_PER_MINUTE):
         self.calls_per_minute = calls_per_minute
         self.calls = []
         self.min_interval = 60.0 / calls_per_minute
@@ -58,51 +60,40 @@ def make_api_request(url: str, headers: Dict, params: Dict = None, rate_limiter:
 
 def collect_fixture_details(fixture_id: int, api, db, rate_limiter: RateLimiter) -> Dict:
     try:
-        # Get events
-        events_data = make_api_request(
-            f"{api.base_url}/fixtures/events",
+        # Check if the fixture already exists in the database
+        fixture_ref = db.collection('fixtures').document(str(fixture_id))
+        fixture_doc = fixture_ref.get()
+        
+        if fixture_doc.exists:
+            logger.info(f"Fixture {fixture_id} already exists in the database. Skipping API call.")
+            return fixture_doc.to_dict()
+        
+        # Get fixture details
+        fixture_data = make_api_request(
+            f"{api.base_url}/fixtures",
             headers=api.headers,
-            params={'fixture': fixture_id},
+            params={'ids': fixture_id},
             rate_limiter=rate_limiter
         )
         
-        # Get lineups
-        lineups_data = make_api_request(
-            f"{api.base_url}/fixtures/lineups",
-            headers=api.headers,
-            params={'fixture': fixture_id},
-            rate_limiter=rate_limiter
-        )
-        
-        # Get statistics
-        stats_data = make_api_request(
-            f"{api.base_url}/fixtures/statistics",
-            headers=api.headers,
-            params={'fixture': fixture_id},
-            rate_limiter=rate_limiter
-        )
-        
-        # Get players
-        players_data = make_api_request(
-            f"{api.base_url}/fixtures/players",
-            headers=api.headers,
-            params={'fixture': fixture_id},
-            rate_limiter=rate_limiter
-        )
-        
-        return {
-            'events': events_data.get('response', []),
-            'lineups': lineups_data.get('response', []),
-            'statistics': stats_data.get('response', []),
-            'players': players_data.get('response', [])
-        }
+        if fixture_data.get('response'):
+            fixture_details = fixture_data['response'][0]
+            return {
+                'events': fixture_details.get('events', []),
+                'lineups': fixture_details.get('lineups', []),
+                'statistics': fixture_details.get('statistics', []),
+                'players': fixture_details.get('players', [])
+            }
+        else:
+            logger.warning(f"No data found for fixture {fixture_id}")
+            return {}
     except Exception as e:
         logger.error(f"Error collecting details for fixture {fixture_id}: {e}")
         return {}
 
 def process_collection(api, league_id, season):
     try:
-        rate_limiter = RateLimiter(30)
+        rate_limiter = RateLimiter(CALLS_PER_MINUTE)
         
         def add_log(message):
             timestamp = datetime.now().strftime("%H:%M:%S")
