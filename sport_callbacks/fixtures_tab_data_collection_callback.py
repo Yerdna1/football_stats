@@ -28,10 +28,10 @@ class GlobalState:
 global_state = GlobalState()
 
 class RateLimiter:
-    def __init__(self, calls_per_minute=CALLS_PER_MINUTE):
+    def __init__(self, calls_per_minute=30):
         self.calls_per_minute = calls_per_minute
         self.calls = []
-        self.min_interval = 60.0 / calls_per_minute
+        self.min_interval = 60.0 /calls_per_minute
 
     def wait_if_needed(self):
         now = time.time()
@@ -93,7 +93,8 @@ def collect_fixture_details(fixture_id: int, api, db, rate_limiter: RateLimiter)
 
 def process_collection(api, league_id, season):
     try:
-        rate_limiter = RateLimiter(CALLS_PER_MINUTE)
+
+        rate_limiter = RateLimiter(30)
         
         def add_log(message):
             timestamp = datetime.now().strftime("%H:%M:%S")
@@ -138,6 +139,8 @@ def process_collection(api, league_id, season):
             
             for fixture in chunk:
                 fixture_id = fixture['fixture']['id']
+                fixture_id = fixture_id if isinstance(fixture_id, str) else fixture_id
+
                 home_team = fixture['teams']['home']['name']
                 away_team = fixture['teams']['away']['name']
                 
