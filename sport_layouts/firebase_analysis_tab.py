@@ -28,6 +28,8 @@ def create_firebase_analysis_tab():
                         id='analyze-data-button',
                         className='button-primary mb-4'
                     ),
+          
+                    
                     
                     # Data Quality Section
                     html.Div([
@@ -41,7 +43,42 @@ def create_firebase_analysis_tab():
                         html.Div(id='player-stats-container'),
                           html.Div(id='firebase-error-container'),
                     ])
+                ], className='p-4'),
+
+
+                # CSV Analysis Section
+                html.Div([
+                    html.H2("CSV Analysis", className='text-2xl font-bold mb-4'),
+                    dcc.Upload(
+                        id='csv-upload',
+                        children=html.Div([
+                            'Drag and Drop or ',
+                            html.A('Select CSV File')
+                        ]),
+                        style={
+                            'width': '100%',
+                            'height': '60px',
+                            'lineHeight': '60px',
+                            'borderWidth': '1px',
+                            'borderStyle': 'dashed',
+                            'borderRadius': '5px',
+                            'textAlign': 'center',
+                            'margin': '10px 0'
+                        }
+                    ),
+                    html.Button(
+                        'Analyze CSV Data',
+                        id='analyze-csv-button',
+                        className='button-primary mb-4',
+                        style={'margin': '10px 0'}
+                    ),
+                    html.Div([
+                        html.Div(id='csv-data-quality'),
+                        html.Div(id='csv-player-stats'),
+                        html.Div(id='csv-error-container')
+                    ])
                 ], className='p-4')
+
             ]
         )
         logger.debug("Finished create_firebase_analysis_tab function")

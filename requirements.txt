@@ -6,3 +6,5 @@ requests  # Assuming FootballAPI relies on requests
 python-redis
 python-dotenv
 firebase_admin
+openpyxl
+xlrd
