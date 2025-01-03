@@ -2,6 +2,7 @@ import base64
 from collections import defaultdict
 import io
 import logging
+import os
 from typing import Dict
 from venv import logger
 import dash
@@ -14,6 +15,7 @@ from config import ALL_LEAGUES, LEAGUE_NAMES
 from sport_analyzers import LeagueAnalyzer
 from dash import html, dcc, ctx
 from dash.exceptions import PreventUpdate  # Import PreventUpdate
+from sport_analyzers.TEAMS_STATS import analyze_team_data_quality_mod, create_team_report_mod, create_team_statistics_mod
 from sport_analyzers.firebase_analyzer import analyze_data_quality, create_data_quality_report, create_player_statistics, create_player_statistics_table
 from sport_callbacks.fixtures_tab_data_collection_callback import RateLimiter, make_api_request
 import time
@@ -32,7 +34,7 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 
-def fetch_fixtures_with_retry(db, collection_name='fixtures', batch_size=500, retries=3, delay=5):
+def fetch_fixtures_with_retry(db, collection_name='fixtures', batch_size=1000, retries=3, delay=5):
     """
     Fetches data from a Firestore collection with retry logic and pagination.
 
@@ -103,175 +105,192 @@ def fetch_fixtures_with_retry(db, collection_name='fixtures', batch_size=500, re
 
 
 
-
-def parse_csv_content(contents, filename):
-    logger.debug("Starting parse_csv_content")
-    try:
-        content_type, content_string = contents.split(',')
-        decoded = base64.b64decode(content_string)
-        
-        # Handle Excel files
-        if 'excel' in content_type.lower():
-            return pd.read_excel(
-                io.BytesIO(decoded),
-                engine='openpyxl',
-                sheet_name=0  # First sheet
-            )
-        # Handle CSV
-        else:
-            return pd.read_csv(
-                io.BytesIO(decoded),
-                encoding='utf-8-sig',
-                on_bad_lines='skip'
-            )
-            
-    except Exception as e:
-        logger.error(f"Error parsing file: {str(e)}")
-        logger.debug(f"Content type: {content_type}")
-        return None
-
-
-
-
-def analyze_csv_data(df):
-    """Analyze CSV data using same logic as Firebase analysis"""
-    try:
-        if df is None:
-            return None
-
-        stats = {
-            'total_fixtures': len(df),
-            'leagues': defaultdict(lambda: {
-                'fixtures_count': 0,
-                'seasons': set(),
-                'teams': set(),
-                'players': set(),
-                'complete_data': 0,
-                'missing_data': 0
-            })
-        }
-
-        # Apply similar analysis logic as in analyze_data_quality()
-        for _, row in df.iterrows():
-            try:
-                league_id = str(row.get('league_id', ''))
-                if not league_id:
-                    continue
-
-                stats['leagues'][league_id]['fixtures_count'] += 1
-                stats['leagues'][league_id]['seasons'].add(str(row.get('season', '')))
-                
-                # Add team data
-                home_team = row.get('home_team_id')
-                away_team = row.get('away_team_id')
-                if home_team:
-                    stats['leagues'][league_id]['teams'].add(str(home_team))
-                if away_team:
-                    stats['leagues'][league_id]['teams'].add(str(away_team))
-
-            except Exception as e:
-                logger.error(f"Error processing CSV row: {e}", exc_info=True)
-                continue
-
-        return stats
-    except Exception as e:
-        logger.error(f"Error analyzing CSV data: {e}", exc_info=True)
-        return None
-
-
 def setup_firebase_analysis_callbacks(app, db):
     @app.callback(
-        [Output('player-stats-container', 'children'),
-         Output('firebase-error-container', 'children')],
-        [Input('analyze-data-button', 'n_clicks'),
-         Input('csv-upload', 'contents')],
-        [State('csv-upload', 'filename')],
-        prevent_initial_call=True
+    [Output('player-stats-container', 'children'),
+     Output('data-quality-container', 'children'),
+     Output('team-stats-container', 'children')],  # Add output for team stats
+    Input('analyze-data-button', 'n_clicks'),
+    prevent_initial_call=True
     )
-    def update_analysis(n_clicks,  contents, filename):
-        ctx=dash.callback_context
+    def update_analysis(n_clicks):
+        ctx = dash.callback_context
         triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
         logger.debug("Starting update_analysis callback")
+        
         if not n_clicks:
             logger.debug("PreventUpdate triggered, n_clicks is None")
             raise PreventUpdate
-        
 
         if triggered_id == 'analyze-data-button':
             try:
-                    logger.debug("Starting Firebase data analysis process")
-                    quality_stats = analyze_data_quality(db)
-                    logger.debug("Finished analyze_data_quality")
+                logger.debug("Starting data analysis process")
+                
+                # Check if CSV files exist
+                player_stats_csv_path = 'player_statistics.csv'
+                data_quality_csv_path = 'data_quality_report.csv'
+                team_stats_csv_path = 'team_statistics.csv'  # New CSV for team stats
+                
+                if os.path.exists(player_stats_csv_path) and os.path.exists(data_quality_csv_path) and os.path.exists(team_stats_csv_path):
+                    logger.debug("CSV files found, loading data from CSVs")
+                    
+                    # Load player statistics from CSV
+                    player_df = pd.read_csv(player_stats_csv_path)
+                    logger.debug(f"Successfully loaded {len(player_df)} rows from {player_stats_csv_path}")
+                    
+                    # Load data quality report from CSV
+                    data_quality_df = pd.read_csv(data_quality_csv_path)
+                    logger.debug(f"Successfully loaded {len(data_quality_df)} rows from {data_quality_csv_path}")
+                    
+                    # Load team statistics from CSV
+                    team_stats_df = pd.read_csv(team_stats_csv_path)
+                    logger.debug(f"Successfully loaded {len(team_stats_df)} rows from {team_stats_csv_path}")
+                    
+                else:
+                    logger.debug("CSV files not found, fetching data from Firebase")
+                    
+                    # Fetch data from Firebase
                     fixtures_data = fetch_fixtures_with_retry(db)
-                    logger.debug(f"Finished fetch_fixtures_with_retry, {len(fixtures_data)} documents were fetched")
-
-
-                    quality_report = create_data_quality_report(quality_stats)
+                    logger.debug(f"Fetched {len(fixtures_data)} documents from Firebase")
+                    
+                    # Analyze data quality
+                    quality_stats = analyze_data_quality(fixtures_data)
+                    logger.debug("Finished analyze_data_quality")
+                    
+                    # Create data quality report
+                    quality_report, data_quality_df = create_data_quality_report(quality_stats)
                     logger.debug("Finished create_data_quality_report")
+                    
+                    # Create player statistics
                     player_stats = create_player_statistics(fixtures_data)
                     logger.debug("Finished create_player_statistics")
-                    player_df = create_player_statistics_table(player_stats)  # Create DataFrame
+                    
+                    # Create player statistics DataFrame
+                    player_df = create_player_statistics_table(player_stats)
                     logger.debug("Finished create_player_statistics_table")
+                    
+                    # Create team statistics
+                    team_stats = create_team_statistics_mod.create_team_statistics(fixtures_data)
+                    logger.debug("Finished create_team_statistics")
+                    
+                    # Create team quality report
+                    team_quality = analyze_team_data_quality_mod.analyze_team_data_quality(fixtures_data)
+                    logger.debug("Finished analyze_team_data_quality")
+                    
+                    # Create team report
+                    team_report, team_stats_df = create_team_report_mod.create_team_report(team_stats, team_quality)
+                    logger.debug("Finished create_team_report")
+                    
+                    # Save team statistics to CSV
+                    team_stats_df.to_csv(team_stats_csv_path, index=False)
+                    logger.debug(f"Saved team statistics to {team_stats_csv_path}")
 
+                # Debugging: Log data quality table data
+                logger.debug(f"Data quality table columns: {data_quality_df.columns}")
+                logger.debug(f"Data quality table data: {data_quality_df.to_dict('records')}")
 
-                    # Enable CSV download for the player stats table
-                    download_button = dcc.Download(
-                        id='download-player-stats',
-                        data=player_df.to_csv(index=False),  # Convert DataFrame to CSV
-                        type="text/csv",
-                    )
-
-                    player_table = dash_table.DataTable(
-                        columns=[{"name": col, "id": col} for col in player_df.columns],
-                        data=player_df.to_dict('records'),
-                        style_cell={'overflow': 'hidden', 'textOverflow': 'ellipsis'},
-                        style_header={'backgroundColor': 'lightblue', 'fontWeight': 'bold'},
-                        style_data={'backgroundColor': 'lavender'},
-                        export_format='csv',  # Enable built-in export (optional)
-                        export_headers=True,  # Include headers in the exported CSV (optional)
-                        page_size=20,
-                    )
-                    logger.debug("Finished creating player table")
-
-                    logger.debug("Finished Firebase data analysis process successfully")
-                    return html.Div([quality_report, download_button, player_table]), None
-
-            except Exception as e:
-                logger.error(f"Error in analysis: {e}", exc_info=True)
-                return  None,  html.Div(f"Error: {str(e)}")
-        elif triggered_id == 'csv-upload' and contents:
-            try:
-                df = parse_csv_content(contents)
-                numeric_analysis = df.describe()
-                
-                analysis_table = dash_table.DataTable(
-                    columns=[{"name": col, "id": col} for col in numeric_analysis.columns],
-                    data=numeric_analysis.to_dict('records'),
+                # Create player statistics table with pagination
+                player_table = dash_table.DataTable(
+                    id='player-stats-table',
+                    columns=[{"name": col, "id": col} for col in player_df.columns],
+                    data=player_df.to_dict('records'),
+                    filter_action='native',  # Enable filtering
+                    sort_action='native',    # Enable sorting
+                    sort_mode='multi',       # Allow multi-column sorting
+                    page_action='native',    # Enable pagination
+                    page_size=20,            # Show 20 rows per page
+                    persistence=True,        # Persist state
+                    persistence_type='memory',  # Store state in memory
+                    style_table={'overflowX': 'auto'},
                     style_cell={'textAlign': 'left', 'padding': '10px'},
-                    style_header={'backgroundColor': 'rgb(230, 230, 230)'}
+                    style_header={
+                        'backgroundColor': 'lightblue',
+                        'fontWeight': 'bold'
+                    },
+                    style_data={'backgroundColor': 'lavender'},
                 )
-                
-                return dash.no_update, analysis_table
+                logger.debug("Finished creating player statistics table")
+
+                # Create data quality report table with pagination
+                data_quality_table = dash_table.DataTable(
+                    id='data-quality-table',
+                    columns=[{"name": col, "id": col} for col in data_quality_df.columns],
+                    data=data_quality_df.to_dict('records'),
+                    filter_action='native',  # Enable filtering
+                    sort_action='native',    # Enable sorting
+                    sort_mode='multi',       # Allow multi-column sorting
+                    page_action='native',    # Enable pagination
+                    page_size=20,            # Show 20 rows per page
+                    persistence=True,        # Persist state
+                    persistence_type='memory',  # Store state in memory
+                    style_table={'overflowX': 'auto'},
+                    style_cell={'textAlign': 'left', 'padding': '10px'},
+                    style_header={
+                        'backgroundColor': 'lightblue',
+                        'fontWeight': 'bold'
+                    },
+                    style_data={'backgroundColor': 'lavender'},
+                )
+                logger.debug("Finished creating data quality report table")
+
+                # Create team statistics table with pagination
+                team_stats_table = dash_table.DataTable(
+                    id='team-stats-table',
+                    columns=[{"name": col, "id": col} for col in team_stats_df.columns],
+                    data=team_stats_df.to_dict('records'),
+                    filter_action='native',  # Enable filtering
+                    sort_action='native',    # Enable sorting
+                    sort_mode='multi',       # Allow multi-column sorting
+                    page_action='native',    # Enable pagination
+                    page_size=20,            # Show 20 rows per page
+                    persistence=True,        # Persist state
+                    persistence_type='memory',  # Store state in memory
+                    style_table={'overflowX': 'auto'},
+                    style_cell={'textAlign': 'left', 'padding': '10px'},
+                    style_header={
+                        'backgroundColor': 'lightblue',
+                        'fontWeight': 'bold'
+                    },
+                    style_data={'backgroundColor': 'lavender'},
+                )
+                logger.debug("Finished creating team statistics table")
+
+                # Enable CSV download for the player stats table
+                player_download_button = dcc.Download(
+                    id='download-player-stats',
+                    data=player_df.to_csv(index=False),  # Convert DataFrame to CSV
+                    type="text/csv",
+                )
+
+                # Enable CSV download for the team stats table
+                team_download_button = dcc.Download(
+                    id='download-team-stats',
+                    data=team_stats_df.to_csv(index=False),  # Convert DataFrame to CSV
+                    type="text/csv",
+                )
+
+                # Create tabs for the tables
+                tabs = dcc.Tabs([
+                    dcc.Tab(
+                        label='Player Statistics',
+                        children=html.Div([player_download_button, player_table])
+                    ),
+                    dcc.Tab(
+                        label='Data Quality Report',
+                        children=html.Div(data_quality_table)
+                    ),
+                    dcc.Tab(
+                        label='Team Statistics',
+                        children=html.Div([team_download_button, team_stats_table])
+                    )
+                ])
+
+                logger.debug("Finished data analysis process successfully")
+                return tabs, dash.no_update, dash.no_update  # Update all containers
+
             except Exception as e:
                 logger.error(f"Error in analysis: {e}", exc_info=True)
-                return  None,  html.Div(f"Error: {str(e)}")
-
+                return None, html.Div(f"Error: {str(e)}"), None
+            
+        logger.error(f"Unexpected trigger: {triggered_id}")
         raise PreventUpdate
-    @app.callback(
-    [Output('csv-data-quality', 'children'),
-     Output('csv-player-stats', 'children'),
-     Output('csv-error-container', 'children')],
-    [Input('analyze-csv-button', 'n_clicks')],
-    [State('csv-upload', 'contents'),
-     State('csv-upload', 'filename')]
-    )
-    def update_csv_analysis(n_clicks, contents, filename):
-        if not contents:
-            raise PreventUpdate
-            
-        df = parse_csv_content(contents, filename)
-        if df is None:
-            return None, None, "Error parsing CSV file"
-            
-        return analyze_csv_data(df)
-                

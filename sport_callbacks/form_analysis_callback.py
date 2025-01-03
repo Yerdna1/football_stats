@@ -1,8 +1,11 @@
 from datetime import datetime
 import json
+from venv import logger
 from dash.dependencies import Input, Output
+import api
 from config import ALL_LEAGUES, LEAGUE_NAMES, PERF_DIFF_THRESHOLD
 from sport_analyzers.form_analyzer import FormAnalyzer
+from dash.exceptions import PreventUpdate
 
 # Form Analysis Callbacks
 def setup_form_analysis_callbacks(app, api):  
@@ -145,21 +148,20 @@ def setup_form_analysis_callbacks(app, api):
    
       
     @app.callback(
-        [Output('form-analysis-table', 'data'),
-         Output('upcoming-fixtures-table', 'data')],
-        [Input('form-league-dropdown', 'value'),
-         Input('form-length-selector', 'value')]
+    [Output('form-analysis-table', 'data'),
+     Output('upcoming-fixtures-table', 'data')],
+    [Input('form-league-dropdown', 'value'),
+     Input('form-length-selector', 'value')]
     )
     def update_form_analysis(league_id, form_length):
+        logger.info("update_form_analysis callback triggered")
         if not league_id:
             return [], []
 
         try:
             if league_id == ALL_LEAGUES:
                 form_analysis = api.fetch_all_teams(LEAGUE_NAMES, form_length)
-
             else:
-                # Fetch standings and fixtures for a single league
                 standings = api.fetch_standings(league_id)
                 if not standings or not standings.get('response'):
                     return [], []
@@ -167,14 +169,12 @@ def setup_form_analysis_callbacks(app, api):
                 standings_data = standings['response'][0]['league']['standings'][0]
                 fixtures = api.fetch_fixtures(league_id)
 
-                # Analyze form vs standings
                 form_analysis = []
                 for team in standings_data:
                     team_id = team['team']['id']
                     team_name = team['team']['name']
                     actual_points = team['points']
 
-                    # Get form analysis
                     form_data = FormAnalyzer.analyze_team_form(fixtures, team_id, form_length)
 
                     if form_data['matches_analyzed'] == form_length:
@@ -182,12 +182,10 @@ def setup_form_analysis_callbacks(app, api):
                         current_ppg = actual_points / matches_played if matches_played > 0 else 0
                         form_ppg = form_data['points'] / form_length
                         form_vs_actual_diff = form_ppg - current_ppg
-                        # Get injuries and history
                         injury_display = get_team_injuries_and_history(api, team_id, fixtures)
                         league_info = LEAGUE_NAMES.get(league_id, {})
                         performance_diff = round(form_vs_actual_diff, 2)
-                        
-                        # Only include teams where the absolute performance_diff > PERF_DIFF_THRESHOLD
+
                         if abs(performance_diff) > PERF_DIFF_THRESHOLD:
                             form_analysis.append({
                                 'team_id': team_id,
@@ -205,7 +203,6 @@ def setup_form_analysis_callbacks(app, api):
 
                 form_analysis.sort(key=lambda x: abs(x['performance_diff']), reverse=True)
 
-            # Get upcoming fixtures for top 50 teams
             upcoming_fixtures_data = []
             for team_data in form_analysis[:50]:
                 upcoming_matches = FormAnalyzer.get_upcoming_opponents(
@@ -213,13 +210,9 @@ def setup_form_analysis_callbacks(app, api):
 
                 if upcoming_matches:
                     next_match = upcoming_matches[0]
-
-                    # Check if the date is in the correct format; parse and format it
                     try:
-                        # Try to parse the date as '%Y-%m-%dT%H:%M:%S%z' first (standard API format)
                         match_date_here = datetime.strptime(next_match['date'], "%Y-%m-%dT%H:%M:%S%z")
                     except ValueError:
-                        # If it fails, try parsing it as '%d-%b-%Y' (e.g., '26-Dec-2024')
                         match_date_here = datetime.strptime(next_match['date'], "%d-%b-%Y")
 
                     formatted_date_here = match_date_here.strftime("%d-%b-%Y")
@@ -234,17 +227,13 @@ def setup_form_analysis_callbacks(app, api):
                         'venue': next_match['venue']
                     })
 
-            # Sort upcoming fixtures by the original date format
             upcoming_fixtures_data.sort(key=lambda x: datetime.strptime(x['date'], "%d-%b-%Y"))
 
-            # Add caption rows with red background before each new date
             final_fixtures_data = []
             last_date = None
             for match in upcoming_fixtures_data:
-                # Use the formatted date directly
                 formatted_date = match['date']
                 if formatted_date != last_date:
-                    # Add a caption row for the new date
                     final_fixtures_data.append({
                         'team': f"Date: {formatted_date}",
                         'league': '',
@@ -253,13 +242,11 @@ def setup_form_analysis_callbacks(app, api):
                         'date': formatted_date,
                         'time': '',
                         'venue': '',
-                        'caption': True,  # Used to identify the row as a caption
-                        'style': {'backgroundColor': 'red', 'color': 'white'}  # Apply red background directly
-
+                        'caption': True,
+                        'style': {'backgroundColor': 'red', 'color': 'white'}
                     })
                     last_date = formatted_date
 
-                # Add the actual fixture row
                 final_fixtures_data.append({
                     'team': match['team'],
                     'league': match['league'],
@@ -268,11 +255,10 @@ def setup_form_analysis_callbacks(app, api):
                     'date': match['date'],
                     'time': match['time'],
                     'venue': match['venue'],
-                    'caption': False, # Regular fixture row
-                    'style': {}  # Default style for regular rows
+                    'caption': False,
+                    'style': {}
                 })
 
-            # Now, format the rows that are captions or have empty performance_diff
             for fixture in final_fixtures_data:
                 if fixture.get('caption', False) or not fixture.get('performance_diff'):
                     fixture['style'] = {'backgroundColor': 'red', 'color': 'white'}
@@ -280,23 +266,23 @@ def setup_form_analysis_callbacks(app, api):
             return form_analysis, final_fixtures_data
 
         except Exception as e:
-            print(f"Error in form analysis: {str(e)}")
+            logger.error(f"Error in form analysis: {str(e)}")
             import traceback
             traceback.print_exc()
             return [], []
-    
+        
     # form_analysis_callback.py
 
 
     @app.callback(
-        [Output('basic-stats-container', 'style'),
-         Output('advanced-stats-container', 'style'),
-         Output('player-stats-table', 'data'),
-         Output('advanced-stats-table', 'data')],
-        [Input('form-league-dropdown', 'value'),
-         Input('stats-type-selector', 'value'),
-         Input('team-selector-dropdown', 'value'),
-         Input('form-analysis-table', 'data')]
+    [Output('basic-stats-container', 'style'),
+     Output('advanced-stats-container', 'style'),
+     Output('player-stats-table', 'data'),
+     Output('advanced-stats-table', 'data')],
+    [Input('form-league-dropdown', 'value'),
+     Input('stats-type-selector', 'value'),
+     Input('team-selector-dropdown', 'value'),
+     Input('form-analysis-table', 'data')]
     )
     def update_player_stats(league_id, stats_type, selected_team, form_data):
         print(f"Updating player stats for league {league_id}, selected team: {selected_team}")
@@ -305,10 +291,10 @@ def setup_form_analysis_callbacks(app, api):
         if not league_id or not form_data:
             return {'display': 'none'}, {'display': 'none'}, [], []
         
-        # If no team is selected, do not process
+        # If no team is selected, do not update the tables
         if not selected_team:
-            print("No team selected. Skipping processing.")
-            return {'display': 'none'}, {'display': 'none'}, [], []
+            print("No team selected. Retaining existing table data.")
+            raise PreventUpdate  # Prevent the callback from updating the outputs
 
         try:
             all_player_stats = []
