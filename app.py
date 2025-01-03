@@ -75,7 +75,7 @@ class DashboardApp:
     def setup_callbacks(self):
         api = self.api
         setup_winless_streaks_callbacks(self.app, self.api)
-        setup_team_analysis_callbacks(self.app, self.api)
+        setup_team_analysis_callbacks(self.app, self.api, db)
         setup_next_fixtures_callbacks(self.app, self.api)
         setup_league_stats_callbacks(self.app, self.api)  
         setup_form_analysis_callbacks(self.app, self.api)

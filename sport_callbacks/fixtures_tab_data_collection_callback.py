@@ -10,12 +10,14 @@ import time
 from typing import Dict, List, Any
 import logging
 import threading
+import os
 
 from config import CALLS_PER_MINUTE
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class GlobalState:
     def __init__(self):
@@ -24,39 +26,71 @@ class GlobalState:
         self.current_error = ""
         self.log_messages = []
         self.is_running = False
+        self.lock = threading.Lock()  # Add a lock for thread safety
+
+    def update_status(self, status):
+        with self.lock:
+            self.current_status = status
+
+    def update_progress(self, progress):
+        with self.lock:
+            self.current_progress = progress
+
+    def update_error(self, error):
+        with self.lock:
+            self.current_error = error
+
+    def add_log(self, message):
+        with self.lock:
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            log_entry = html.Div(f"[{timestamp}] {message}", style={'marginBottom': '5px'})
+            self.log_messages.append(log_entry)
 
 global_state = GlobalState()
 
 class RateLimiter:
-    def __init__(self, calls_per_minute=30):
+    def __init__(self, calls_per_minute=60):
         self.calls_per_minute = calls_per_minute
         self.calls = []
-        self.min_interval = 60.0 /calls_per_minute
+        self.min_interval = 60.0 / calls_per_minute
 
     def wait_if_needed(self):
         now = time.time()
+        # Remove calls older than 60 seconds
         self.calls = [call_time for call_time in self.calls if now - call_time < 60]
+        
         if len(self.calls) >= self.calls_per_minute:
             sleep_time = 60 - (now - self.calls[0])
             if sleep_time > 0:
                 time.sleep(sleep_time)
+        
         self.calls.append(now)
 
 def make_api_request(url: str, headers: Dict, params: Dict = None, rate_limiter: RateLimiter = None) -> Dict:
     try:
         if rate_limiter:
             rate_limiter.wait_if_needed()
+        
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
-        data = response.json()
+        
+        try:
+            data = response.json()
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON response: {e}")
+            raise
+        
         if data.get('errors'):
             raise Exception(f"API Error: {data['errors']}")
+        
         return data
-    except Exception as e:
-        logger.error(f"API Request failed: {str(e)}")
+    
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Network error during API request: {e}")
         raise
-
-
+    except Exception as e:
+        logger.error(f"Unexpected error during API request: {e}")
+        raise
 
 def collect_fixture_details(fixture_id: int, api, db, rate_limiter: RateLimiter) -> Dict:
     try:
@@ -93,16 +127,14 @@ def collect_fixture_details(fixture_id: int, api, db, rate_limiter: RateLimiter)
 
 def process_collection(api, league_id, season):
     try:
-
-        rate_limiter = RateLimiter(30)
+        # Ensure CALLS_PER_MINUTE is an integer
+        calls_per_minute = int(CALLS_PER_MINUTE)
+        rate_limiter = RateLimiter(calls_per_minute)
+        db = firestore.client()
         
         def add_log(message):
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            print(f"[{timestamp}] {message}")
-            global_state.log_messages.append(
-                html.Div(f"[{timestamp}] {message}", style={'marginBottom': '5px'})
-            )
-            global_state.current_status = message
+            logger.info(message)
+            global_state.add_log(message)
 
         add_log(f"Starting data collection for League ID: {league_id}, Season: {season}")
         
@@ -126,9 +158,6 @@ def process_collection(api, league_id, season):
         total_fixtures = len(fixtures)
         add_log(f"Found {total_fixtures} fixtures to process")
         
-        db = firestore.client()
-        add_log("Connected to Firebase database")
-        
         chunk_size = 20
         chunks = [fixtures[i:i + chunk_size] for i in range(0, len(fixtures), chunk_size)]
         total_processed = 0
@@ -139,7 +168,7 @@ def process_collection(api, league_id, season):
             
             for fixture in chunk:
                 fixture_id = fixture['fixture']['id']
-                fixture_id = fixture_id if isinstance(fixture_id, str) else fixture_id
+                fixture_id = str(fixture_id)  # Ensure fixture_id is a string
 
                 home_team = fixture['teams']['home']['name']
                 away_team = fixture['teams']['away']['name']
@@ -162,31 +191,43 @@ def process_collection(api, league_id, season):
                 
                 if details.get('events'):
                     add_log(f"- Collected {len(details['events'])} events")
+                else:
+                    add_log("- No events found for this fixture")
+
                 if details.get('lineups'):
                     add_log(f"- Collected {len(details['lineups'])} lineups")
+                else:
+                    add_log("- No lineups found for this fixture")
+
                 if details.get('statistics'):
-                    add_log(f"- Collected statistics")
+                    add_log("- Collected statistics")
+                else:
+                    add_log("- No statistics found for this fixture")
+
                 if details.get('players'):
                     total_players = sum(len(team_players) for team_players in details['players'])
                     add_log(f"- Collected data for {total_players} players")
+                else:
+                    add_log("- No player data found for this fixture")
                 
-                fixture_ref = db.collection('fixtures').document(str(fixture_id))
+                fixture_ref = db.collection('fixtures').document(fixture_id)
                 batch.set(fixture_ref, fixture_data)
             
             batch.commit()
             add_log(f"Committed batch {i+1} of {len(chunks)}")
             
             total_processed += len(chunk)
-            progress = (total_processed / total_fixtures) * 100
-            global_state.current_progress = f"Progress: {progress:.1f}% ({total_processed}/{total_fixtures})"
+            if total_fixtures > 0:
+                progress = (total_processed / total_fixtures) * 100
+                global_state.update_progress(f"Progress: {progress:.1f}% ({total_processed}/{total_fixtures})")
 
         add_log("Data collection completed successfully!")
-        global_state.is_running = False
         
     except Exception as e:
         error_message = str(e)
         add_log(f"ERROR: {error_message}")
-        global_state.current_error = error_message
+        global_state.update_error(error_message)
+    finally:
         global_state.is_running = False
 
 def setup_data_collection_callbacks(app, api):
@@ -277,20 +318,22 @@ def setup_data_collection_callbacks(app, api):
         if not n_clicks or not league_id or not season:
             raise PreventUpdate
             
-        if not global_state.is_running:
-            global_state.is_running = True
-            global_state.current_status = "Starting collection..."
-            global_state.current_progress = ""
-            global_state.current_error = ""
-            global_state.log_messages = []
-            
-            # Start collection in a separate thread
-            thread = threading.Thread(
-                target=process_collection,
-                args=(api, league_id, season)
-            )
-            thread.start()
-            
+        if global_state.is_running:
+            raise PreventUpdate  # Prevent multiple starts
+        
+        global_state.is_running = True
+        global_state.update_status("Starting collection...")
+        global_state.update_progress("")
+        global_state.update_error("")
+        global_state.log_messages = []
+        
+        # Start collection in a separate thread
+        thread = threading.Thread(
+            target=process_collection,
+            args=(api, league_id, season)
+        )
+        thread.start()
+        
         return {'status': 'started'}
 
     @app.callback(
@@ -305,5 +348,5 @@ def setup_data_collection_callbacks(app, api):
             global_state.current_status,
             global_state.current_progress,
             global_state.current_error,
-            global_state.log_messages
+            global_state.log_messages or []
         )
