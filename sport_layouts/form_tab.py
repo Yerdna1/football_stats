@@ -1,6 +1,7 @@
 from dash import html, dcc, dash_table
 
-from config import LEAGUE_NAMES
+from league_names import LEAGUE_NAMES
+
 from .utils import create_league_options
 from .styles import table_cell_style, table_header_style, table_style
 

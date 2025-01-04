@@ -2,7 +2,8 @@ from dash.dependencies import Input, Output
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
-from config import ALL_LEAGUES, LEAGUE_NAMES
+from config import ALL_LEAGUES
+from league_names import LEAGUE_NAMES
 from sport_analyzers import LeagueAnalyzer
 
 def setup_league_stats_callbacks(app, api):

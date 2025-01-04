@@ -6,7 +6,8 @@ from functools import lru_cache
 import json
 from typing import Dict, Any, Optional
 
-from config import ALL_LEAGUES, LEAGUE_NAMES, PERF_DIFF_THRESHOLD
+from config import ALL_LEAGUES, PERF_DIFF_THRESHOLD
+from league_names import LEAGUE_NAMES
 from sport_analyzers.form_analyzer import FormAnalyzer
 
 logger = logging.getLogger(__name__)

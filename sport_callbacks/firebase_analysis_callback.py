@@ -11,7 +11,7 @@ from dash import html, dash_table, dcc
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
-from config import ALL_LEAGUES, LEAGUE_NAMES
+from config import ALL_LEAGUES
 from sport_analyzers import LeagueAnalyzer
 from dash import html, dcc, ctx
 from dash.exceptions import PreventUpdate  # Import PreventUpdate

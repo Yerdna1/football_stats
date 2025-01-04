@@ -2,8 +2,9 @@ from venv import logger
 from dash.dependencies import Input, Output
 import plotly.express as px
 import pandas as pd
+from league_names import LEAGUE_NAMES
 from sport_analyzers import WinlessStreakAnalyzer
-from config import LEAGUE_NAMES 
+
  # Callback to update the winless streaks chart and data table
 def setup_winless_streaks_callbacks(app, api):
     @app.callback(

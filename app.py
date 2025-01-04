@@ -1,8 +1,11 @@
+from collections import defaultdict
+import json
 import os
 import dash
 from dash import dcc, html
 import logging
 from api import FootballAPI
+from league_names import LEAGUE_NAMES
 from sport_callbacks import (
     setup_winless_streaks_callbacks,
     setup_team_analysis_callbacks,
@@ -23,7 +26,7 @@ from sport_layouts import (
     create_form_analysis_tab,
     create_firebase_analysis_tab,
 )
-from config import ALL_LEAGUES, API_KEY, BASE_URL, LEAGUE_NAMES
+from config import ALL_LEAGUES, API_KEY, BASE_URL, FootballDataFetcher, generate_league_names_dict
 from sport_layouts.fixtures_tab_firestore import create_data_collection_tab
 from firebase_config import initialize_firebase
 
@@ -89,7 +92,75 @@ class DashboardApp:
         self.app.run_server(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
     
     
-# Create the dashboard app
+    """  fetcher = FootballDataFetcher()
+        active_leagues = fetcher.find_active_leagues()
+        
+        print(f"\nSummary of Active Leagues for 2024 Season:")
+        print("=========================================")
+        
+        # Group leagues by country
+        leagues_by_country = defaultdict(list)
+        for league in active_leagues:
+            leagues_by_country[league['country']].append(league)
+        
+        # Print summary
+        total_countries = len(leagues_by_country)
+        total_leagues = len(active_leagues)
+        print(f"\nFound {total_leagues} active leagues across {total_countries} countries:\n")
+        
+        for country, leagues in sorted(leagues_by_country.items()):
+            flag = leagues[0]['flag']
+            print(f"{flag} {country}:")
+            for league in leagues:
+                print(f"  • {league['name']} ({league['type']}) - {league['fixture_count']} fixtures")
+        
+        # Generate the LEAGUE_NAMES dictionary
+        league_names_content = generate_league_names_dict(active_leagues)
+        
+        # Get current directory
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Save to Python file
+        python_file_path = os.path.join(current_dir, 'league_names.py')
+        print(f"\nSaving Python dictionary to: {python_file_path}")
+        try:
+            with open(python_file_path, 'w', encoding='utf-8') as f:
+                f.write("# Auto-generated league names dictionary for 2024 season\n")
+                f.write("ALL_LEAGUES = -1  # Special value for all leagues\n\n")
+                f.write(league_names_content)
+            print("✅ Successfully saved Python dictionary")
+        except Exception as e:
+            print(f"❌ Error saving Python file: {e}")
+        
+        # Save JSON version
+        json_file_path = os.path.join(current_dir, 'league_names.json')
+        print(f"\nSaving JSON file to: {json_file_path}")
+        try:
+            # Create JSON dictionary
+            league_names_dict = {
+                -1: {"name": "All Leagues", "flag": "🌍", "country": "Global"}
+            }
+            for league in active_leagues:
+                if league['type'].lower() == 'league':
+                    league_names_dict[league['id']] = {
+                        "name": league['name'],
+                        "flag": league['flag'],
+                        "country": league['country']
+                    }
+            
+            with open(json_file_path, 'w', encoding='utf-8') as f:
+                json.dump(league_names_dict, f, indent=4, ensure_ascii=False)
+            print("✅ Successfully saved JSON file")
+        except Exception as e:
+            print(f"❌ Error saving JSON file: {e}")
+        
+        # Print the dictionary content to console as well
+        print("\nGenerated LEAGUE_NAMES dictionary:")
+        print("=================================")
+        print(league_names_content) """
+
+
+
 football_api = FootballAPI(API_KEY, BASE_URL)
 dashboard = DashboardApp(football_api)
 app = dashboard.server  # This is what gunicorn will use
@@ -99,3 +170,5 @@ if __name__ == '__main__':
         dashboard.run(debug=False)
     else:
         dashboard.run(debug=True)
+
+  

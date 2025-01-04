@@ -1,5 +1,6 @@
 import api
-from config import ALL_LEAGUES, LEAGUE_NAMES
+from config import ALL_LEAGUES
+from league_names import LEAGUE_NAMES
 
 
 class LeagueAnalyzer:
