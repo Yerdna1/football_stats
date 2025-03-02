@@ -16,7 +16,7 @@ CALLS_PER_MINUTE=os.getenv('CALLS_PER_MINUTE')
 
 
 ALL_LEAGUES = -1  # Special value for all leagues
-PERF_DIFF_THRESHOLD = 0.6
+PERF_DIFF_THRESHOLD = 0.75
 
 class FootballDataFetcher:
     def __init__(self):
