@@ -4,25 +4,24 @@ from league_names import LEAGUE_NAMES
 
 from .utils import create_league_options
 from .styles import table_cell_style, table_header_style, table_style
+from .translations import get_translation as _  # Import translation function as _
 
 def create_league_stats_tab():
-    return dcc.Tab(label='League Statistics', children=[
+    return dcc.Tab(label=_('League Statistics'), children=[
         
         # League Goals Comparison Chart
         html.Div([
-            html.H2("Goals Comparison Across Leagues",
+            html.H2(_("Goals Comparison Across Leagues"),
                    style={'text-align': 'center', 'margin': '20px 0'}),
             dcc.Graph(id='league-goals-comparison')
         ], style={'margin': '20px 0'}),
-        html.H1("League Statistics Analysis",
-               style={'text-align': 'center', 'margin': '20px'}),
         
-        html.H1("League Statistics Analysis",
+        html.H1(_("League Statistics Analysis"),
                style={'text-align': 'center', 'margin': '20px'}),
         
         # League selector
         html.Div([
-            html.Label('Select League',
+            html.Label(_('Select League'),
                       style={'display': 'block', 'margin-bottom': '5px', 'text-align': 'center'}),
             dcc.Dropdown(
                 id='stats-league-dropdown',
@@ -36,10 +35,10 @@ def create_league_stats_tab():
         html.Div([
             # Average Goals Card
             html.Div([
-                html.H3("Goal Statistics", 
+                html.H3(_("Goal Statistics"), 
                         style={'text-align': 'center', 'color': '#2c3e50'}),
                 html.Div([
-                    html.P("Average Goals per Match:", 
+                    html.P(_("Average Goals per Match:"), 
                            style={'font-weight': 'bold', 'margin': '5px 0'}),
                     html.Span(id='avg-goals-stat',
                              style={'font-size': '24px', 'color': '#e67e22'})
@@ -50,10 +49,10 @@ def create_league_stats_tab():
             
             # Average Yellow Cards Card
             html.Div([
-                html.H3("Yellow Card Statistics", 
+                html.H3(_("Yellow Card Statistics"), 
                         style={'text-align': 'center', 'color': '#2c3e50'}),
                 html.Div([
-                    html.P("Average Yellow Cards per Match:", 
+                    html.P(_("Average Yellow Cards per Match:"), 
                            style={'font-weight': 'bold', 'margin': '5px 0'}),
                     html.Span(id='avg-yellow-stat',
                              style={'font-size': '24px', 'color': '#f1c40f'})
@@ -64,10 +63,10 @@ def create_league_stats_tab():
             
             # Average Red Cards Card
             html.Div([
-                html.H3("Red Card Statistics", 
+                html.H3(_("Red Card Statistics"), 
                         style={'text-align': 'center', 'color': '#2c3e50'}),
                 html.Div([
-                    html.P("Average Red Cards per Match:", 
+                    html.P(_("Average Red Cards per Match:"), 
                            style={'font-weight': 'bold', 'margin': '5px 0'}),
                     html.Span(id='avg-red-stat',
                              style={'font-size': '24px', 'color': '#c0392b'})
@@ -79,14 +78,14 @@ def create_league_stats_tab():
         
         # Common Results Table
         html.Div([
-            html.H2("Most Common Results",
+            html.H2(_("Most Common Results"),
                    style={'text-align': 'center', 'margin': '20px 0'}),
             dash_table.DataTable(
                 id='common-results-table',
                 columns=[
-                    {'name': 'Result', 'id': 'result'},
-                    {'name': 'Count', 'id': 'count'},
-                    {'name': 'Percentage', 'id': 'percentage'}
+                    {'name': _('Result'), 'id': 'result'},
+                    {'name': _('Count'), 'id': 'count'},
+                    {'name': _('Percentage'), 'id': 'percentage'}
                 ],
                 style_cell=table_cell_style,
                 style_header=table_header_style,
