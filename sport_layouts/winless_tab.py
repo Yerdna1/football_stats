@@ -27,7 +27,7 @@ def create_last_matches_table():
     
 def create_winless_streaks_tab():
     return dcc.Tab(label='Série bez výhry', children=[
-        html.H1("Série bez výhry v 5 najlepších európskych ligách", 
+        html.H1("Série bez výhry v 30 najlepších európskych ligách", 
                style={'text-align': 'center', 
                      'margin-bottom': '30px',
                      'margin-top': '20px',
