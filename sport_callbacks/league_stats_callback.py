@@ -67,7 +67,7 @@ def setup_league_stats_callbacks(app, api):
                 dcc.Graph(id='bottom-leagues-chart')
             ])
     
-    # League Goals Comparison Callback - Improved with split charts
+    # League Goals Comparison Callback - Improved with split charts and more compact design
     @app.callback(
         [Output('top-leagues-chart', 'figure'),
          Output('middle-leagues-chart', 'figure'),
@@ -95,14 +95,24 @@ def setup_league_stats_callbacks(app, api):
                             
                             if total_matches > 0:
                                 avg_goals = round(total_goals / total_matches, 2)
+                                
+                                # Get abbreviated country and league names
+                                country_name = league_info['country']
+                                abbreviated_country = country_name if len(country_name) <= 12 else country_name[:10] + '...'
+                                
+                                league_name = league_info['name']
+                                abbreviated_league = league_name if len(league_name) <= 15 else league_name[:13] + '...'
+                                
                                 # Store flag_url separately
                                 league_stats.append({
-                                    'league_name': league_info['name'],
+                                    'league_name': abbreviated_league,
                                     'flag_url': league_info['flag'],
                                     'avg_goals': avg_goals,
                                     'total_goals': total_goals,
                                     'matches': total_matches,
-                                    'country': league_info['country']
+                                    'country': abbreviated_country,
+                                    'full_league_name': league_name,
+                                    'full_country_name': country_name
                                 })
                     except Exception as e:
                         print(f"Error processing league {league_id}: {str(e)}")
@@ -128,71 +138,72 @@ def setup_league_stats_callbacks(app, api):
             middle_df = pd.DataFrame(middle_leagues)
             bottom_df = pd.DataFrame(bottom_leagues)
             
-            # Function to create a chart with flag images
-            def create_chart_with_flags(df, title, color_start=0.3, color_end=1.0):
+            # Function to create a chart with flag images - more compact version
+            def create_compact_chart_with_flags(df, title, color_start=0.3, color_end=1.0):
                 if df.empty:
                     # Return empty figure if no data
                     return px.bar(title="No data available")
                 
-                # Create bar chart with more visual appeal
-                fig = px.bar(
-                    df, 
-                    x='league_name',
-                    y='avg_goals',
-                    title=title,
-                    labels={'league_name': 'League', 'avg_goals': 'Average Goals per Match'},
+                # Create the figure with specific width settings
+                fig = go.Figure()
+                
+                # Add bars
+                fig.add_trace(go.Bar(
+                    x=list(range(len(df))),
+                    y=df['avg_goals'],
                     text=df['avg_goals'].round(2),
-                    color='avg_goals',
-                    color_continuous_scale=[(0, f'rgba(8, 81, 156, {color_start})'), (1, f'rgba(8, 81, 156, {color_end})')],
-                    height=500
-                )
-                
-                # Customize layout
-                fig.update_traces(
-                    texttemplate='%{text}',
                     textposition='outside',
+                    marker_color=[f'rgba(8, 81, 156, {color_start + (color_end - color_start) * (val / max(df["avg_goals"]))})' 
+                                 for val in df['avg_goals']],
                     marker_line_color='rgb(8,48,107)',
-                    marker_line_width=1.5,
-                    opacity=0.85
-                )
+                    marker_line_width=1,
+                    opacity=0.85,
+                    width=0.6,  # Make bars narrower
+                    hoverinfo='text',
+                    hovertext=[f"<b>{row['full_league_name']}</b><br>" +
+                               f"Country: {row['full_country_name']}<br>" +
+                               f"Average Goals: {row['avg_goals']:.2f}<br>" +
+                               f"Total Goals: {row['total_goals']}<br>" +
+                               f"Matches: {row['matches']}"
+                               for _, row in df.iterrows()]
+                ))
                 
-                # Improve layout
+                # Update layout
                 fig.update_layout(
-                    xaxis_tickangle=45,
-                    margin=dict(t=80, l=50, r=50, b=150),  # Increased bottom margin for flags
+                    title=title,
+                    title_font=dict(size=18, color='rgb(8,48,107)'),
+                    height=500,
+                    width=1000,  # Enforce fixed width for better proportions
+                    margin=dict(t=80, l=50, r=50, b=160),  # Increased bottom margin for flags
                     plot_bgcolor='rgba(240,240,240,0.2)',
                     paper_bgcolor='white',
                     font_family="Arial, sans-serif",
                     font=dict(size=12),
-                    title_font=dict(size=18, color='rgb(8,48,107)'),
                     showlegend=False,
-                    coloraxis_showscale=False,
                     xaxis=dict(
                         tickmode='array',
                         tickvals=list(range(len(df))),
-                        ticktext=['' for _ in range(len(df))]
-                    )
+                        ticktext=['' for _ in range(len(df))],
+                        showgrid=False,
+                        showline=True,
+                        linewidth=1,
+                        linecolor='lightgrey',
+                        title='',
+                        constrain='domain'  # This helps maintain consistent spacing
+                    ),
+                    yaxis=dict(
+                        title='Average Goals per Match',
+                        titlefont=dict(size=14),
+                        gridcolor='lightgrey',
+                        showline=True,
+                        linewidth=1,
+                        linecolor='lightgrey',
+                        range=[0, max(df['avg_goals']) * 1.1],  # Add 10% padding to y-axis
+                    ),
+                    uniformtext=dict(mode='hide', minsize=10),
                 )
                 
-                # Add grid lines and improve axes
-                fig.update_xaxes(
-                    showgrid=False,
-                    showline=True,
-                    linewidth=1,
-                    linecolor='lightgrey',
-                    title_font=dict(size=14)
-                )
-                
-                fig.update_yaxes(
-                    gridcolor='lightgrey',
-                    showline=True,
-                    linewidth=1,
-                    linecolor='lightgrey',
-                    range=[0, max(df['avg_goals']) * 1.1],  # Add 10% padding to y-axis
-                    title_font=dict(size=14)
-                )
-                
-                # Add flag images below the bars using annotations
+                # Add flag images below the bars - using smaller sizes
                 for i, row in enumerate(df.to_dict('records')):
                     # Add flag images
                     fig.add_layout_image(
@@ -201,58 +212,54 @@ def setup_league_stats_callbacks(app, api):
                             xref="x",
                             yref="paper",
                             x=i,
-                            y=-0.15,
-                            sizex=0.7,  # Slightly smaller
-                            sizey=0.1,
+                            y=-0.14,
+                            sizex=0.5,  # Make flags smaller (was 0.7)
+                            sizey=0.06,  # Make flags smaller (was 0.1)
                             xanchor="center",
                             yanchor="middle"
                         )
                     )
                     
-                    # Add league name below flag
+                    # Add league name below flag - smaller font
                     fig.add_annotation(
                         x=i,
-                        y=-0.25,
+                        y=-0.22,
                         text=row['league_name'],
                         showarrow=False,
                         xref="x",
                         yref="paper",
                         font=dict(
                             family="Arial, sans-serif",
-                            size=10,
+                            size=9,  # Smaller font (was 10)
                             color="black"
                         ),
-                        align="center"
+                        align="center",
+                        textangle=45  # Angled text for better fit
                     )
                     
-                    # Add country name for clarity
+                    # Add country name - even smaller font
                     fig.add_annotation(
                         x=i,
-                        y=-0.32,
+                        y=-0.28,
                         text=row['country'],
                         showarrow=False,
                         xref="x",
                         yref="paper",
                         font=dict(
                             family="Arial, sans-serif",
-                            size=8,
+                            size=7,  # Smaller font (was 8)
                             color="gray"
                         ),
-                        align="center"
+                        align="center",
+                        textangle=45  # Angled text for better fit
                     )
-                
-                # Add hover data with more information
-                fig.update_traces(
-                    hovertemplate='<b>%{x}</b><br>Average Goals: %{y:.2f}<br>Total Goals: %{customdata[0]}<br>Matches: %{customdata[1]}<br>Country: %{customdata[2]}',
-                    customdata=df[['total_goals', 'matches', 'country']].values
-                )
                 
                 return fig
             
             # Create individual charts
-            top_fig = create_chart_with_flags(top_df, "Top Leagues by Average Goals", 0.7, 1.0)
-            middle_fig = create_chart_with_flags(middle_df, "Mid-Tier Leagues by Average Goals", 0.5, 0.8)
-            bottom_fig = create_chart_with_flags(bottom_df, "Bottom Leagues by Average Goals", 0.3, 0.6)
+            top_fig = create_compact_chart_with_flags(top_df, "Top Leagues by Average Goals", 0.7, 1.0)
+            middle_fig = create_compact_chart_with_flags(middle_df, "Mid-Tier Leagues by Average Goals", 0.5, 0.8)
+            bottom_fig = create_compact_chart_with_flags(bottom_df, "Bottom Leagues by Average Goals", 0.3, 0.6)
             
             return top_fig, middle_fig, bottom_fig
             
