@@ -9,17 +9,20 @@ from .translations import get_translation as _  # Import translation function if
 def preprocess_form_data(data):
     """
     Preprocesses the 'form' column into a list of HTML spans for conditional formatting.
+    Make sure to use 'presentation': 'html' for the form column in the DataTable.
     """
     for row in data:
         form = row.get("form", "")
         styled_form = ""
         for char in form:
             if char == "W":
-                styled_form += f"<span style='background-color: #4CAF50; color: white; padding: 3px 6px; margin: 2px; border-radius: 4px; font-weight: bold;'>{char}</span>"
+                styled_form += f"<span style='display:inline-block; background-color:#4CAF50; color:white; padding:3px 6px; margin:2px; border-radius:4px; font-weight:bold;'>{char}</span>"
             elif char == "L":
-                styled_form += f"<span style='background-color: #F44336; color: white; padding: 3px 6px; margin: 2px; border-radius: 4px; font-weight: bold;'>{char}</span>"
-            else:  # Draw
-                styled_form += f"<span style='background-color: #FFC107; color: #333; padding: 3px 6px; margin: 2px; border-radius: 4px; font-weight: bold;'>{char}</span>"
+                styled_form += f"<span style='display:inline-block; background-color:#F44336; color:white; padding:3px 6px; margin:2px; border-radius:4px; font-weight:bold;'>{char}</span>"
+            elif char == "D":
+                styled_form += f"<span style='display:inline-block; background-color:#FFC107; color:#333; padding:3px 6px; margin:2px; border-radius:4px; font-weight:bold;'>{char}</span>"
+            else:
+                styled_form += f"<span style='display:inline-block; margin:2px;'>{char}</span>"
         row["form"] = styled_form
     return data
 
@@ -193,7 +196,7 @@ def create_form_analysis_tab():
                             {'name': 'Aktuálna pozícia', 'id': 'current_position'},
                             {'name': 'Body', 'id': 'current_points'},
                             {'name': 'Priemer bodov', 'id': 'current_ppg'},
-                            {'name': 'Aktuálna forma', 'id': 'form', 'presentation': 'markdown'},
+                            {'name': 'Aktuálna forma', 'id': 'form', 'presentation': 'html'},
                             {'name': 'Body z formy', 'id': 'form_points'},
                             {'name': 'Priemer bodov z formy', 'id': 'form_ppg'},
                             {'name': 'Rozdiel výkonu', 'id': 'performance_diff'},
@@ -203,6 +206,8 @@ def create_form_analysis_tab():
                         style_header=enhanced_header_style,
                         style_table=enhanced_table_style,
                         data=[],
+                        # Allow HTML content
+                        dangerously_allow_html=True,
                         style_data_conditional=[
                             {
                                 'if': {'column_id': 'performance_diff', 'filter_query': '{performance_diff} > 0'},
