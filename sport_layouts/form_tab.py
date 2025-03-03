@@ -9,7 +9,6 @@ from .translations import get_translation as _  # Import translation function if
 def preprocess_form_data(data):
     """
     Preprocesses the 'form' column into a list of HTML spans for conditional formatting.
-    Make sure to use 'presentation': 'html' for the form column in the DataTable.
     """
     for row in data:
         form = row.get("form", "")
@@ -24,6 +23,17 @@ def preprocess_form_data(data):
             else:
                 styled_form += f"<span style='display:inline-block; margin:2px;'>{char}</span>"
         row["form"] = styled_form
+    return data
+
+def preprocess_league_data(data):
+    """
+    Converts league flag URLs to actual image tags
+    """
+    for row in data:
+        flag_url = row.get("league", "")
+        if flag_url and isinstance(flag_url, str) and flag_url.startswith("https://"):
+            # Convert URL to an image tag with appropriate styling
+            row["league"] = f'<img src="{flag_url}" style="width:30px; height:20px; object-fit:contain;" alt="League Flag" />'
     return data
 
 # Enhanced styles
@@ -45,15 +55,6 @@ header_style = {
     'borderBottom': '2px solid #3498DB',
 }
 
-subheader_style = {
-    'textAlign': 'center',
-    'color': '#34495E',
-    'fontFamily': 'Arial, sans-serif',
-    'margin': '15px 0',
-    'padding': '5px',
-}
-
-# Enhanced table styles
 enhanced_table_style = {
     'overflowX': 'auto',
     'width': '100%',
@@ -192,7 +193,7 @@ def create_form_analysis_tab():
                         id='form-analysis-table',
                         columns=[
                             {'name': 'Tím', 'id': 'team'},
-                            {'name': 'Liga', 'id': 'league'},
+                            {'name': 'Liga', 'id': 'league', 'presentation': 'html'}, # Changed to display HTML
                             {'name': 'Aktuálna pozícia', 'id': 'current_position'},
                             {'name': 'Body', 'id': 'current_points'},
                             {'name': 'Priemer bodov', 'id': 'current_ppg'},
@@ -206,8 +207,7 @@ def create_form_analysis_tab():
                         style_header=enhanced_header_style,
                         style_table=enhanced_table_style,
                         data=[],
-                        # Allow HTML content
-                        dangerously_allow_html=True,
+                        # Removed dangerously_allow_html parameter
                         style_data_conditional=[
                             {
                                 'if': {'column_id': 'performance_diff', 'filter_query': '{performance_diff} > 0'},
