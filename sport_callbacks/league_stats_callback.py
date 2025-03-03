@@ -116,8 +116,8 @@ def setup_league_stats_callbacks(app, api):
             
             # Split into three categories
             total_leagues = len(league_stats)
-            top_count = min(15, total_leagues // 3 + (1 if total_leagues % 3 > 0 else 0))
-            middle_count = min(15, total_leagues // 3 + (1 if total_leagues % 3 > 1 else 0))
+            top_count = min(20, total_leagues // 3 + (1 if total_leagues % 3 > 0 else 0))
+            middle_count = min(20, total_leagues // 3 + (1 if total_leagues % 3 > 1 else 0))
             
             top_leagues = league_stats[:top_count]
             middle_leagues = league_stats[top_count:top_count+middle_count]
