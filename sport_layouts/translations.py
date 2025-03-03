@@ -6,6 +6,7 @@ TRANSLATIONS = {
     "Team Analysis": "Analýza tímov",
     "League Statistics": "Štatistiky ligy",
     "Next Round": "Nasledujúce kolo",
+    "Firebase Analysis": "Firebase analýza",
     
     # Section titles
     "Time Analysis Dashboard": "Dashboard časovej analýzy",
@@ -24,6 +25,11 @@ TRANSLATIONS = {
     "Next Round Fixtures and Analysis": "Zápasy a analýza nasledujúceho kola",
     "Upcoming Fixtures": "Nadchádzajúce zápasy",
     "Match Analysis": "Analýza zápasu",
+    "Data Quality Analysis": "Analýza kvality dát",
+    "Player Statistics": "Štatistiky hráčov",
+    "Team Statistics": "Štatistiky tímu",
+    "Team Quality Report": "Správa o kvalite tímu",
+    "Team Report": "Správa o tíme",
     
     # UI elements
     "Select League": "Vybrať ligu",
@@ -32,6 +38,8 @@ TRANSLATIONS = {
     "Average Yellow Cards per Match:": "Priemer žltých kariet na zápas:",
     "Average Red Cards per Match:": "Priemer červených kariet na zápas:",
     "Select a fixture to analyze": "Vyberte zápas na analýzu",
+    "Analyze Data": "Analyzovať dáta",
+    "Error creating firebase tab": "Chyba pri vytváraní karty firebase",
     
     # Table headers
     "Date": "Dátum",
