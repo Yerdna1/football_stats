@@ -5,6 +5,7 @@ TRANSLATIONS = {
     # Tab names
     "Team Analysis": "Analýza tímov",
     "League Statistics": "Štatistiky ligy",
+    "Next Round": "Nasledujúce kolo",
     
     # Section titles
     "Time Analysis Dashboard": "Dashboard časovej analýzy",
@@ -20,6 +21,9 @@ TRANSLATIONS = {
     "Yellow Card Statistics": "Štatistiky žltých kariet",
     "Red Card Statistics": "Štatistiky červených kariet",
     "Most Common Results": "Najčastejšie výsledky",
+    "Next Round Fixtures and Analysis": "Zápasy a analýza nasledujúceho kola",
+    "Upcoming Fixtures": "Nadchádzajúce zápasy",
+    "Match Analysis": "Analýza zápasu",
     
     # UI elements
     "Select League": "Vybrať ligu",
@@ -27,16 +31,26 @@ TRANSLATIONS = {
     "Average Goals per Match:": "Priemer gólov na zápas:",
     "Average Yellow Cards per Match:": "Priemer žltých kariet na zápas:",
     "Average Red Cards per Match:": "Priemer červených kariet na zápas:",
+    "Select a fixture to analyze": "Vyberte zápas na analýzu",
     
     # Table headers
     "Date": "Dátum",
+    "Time": "Čas",
     "Opponent": "Súper",
     "Score": "Skóre",
     "Result": "Výsledok",
     "Team": "Tím",
     "Games Without Scoring": "Zápasy bez skórovania",
     "Count": "Počet",
-    "Percentage": "Percentuálny podiel"
+    "Percentage": "Percentuálny podiel",
+    "League": "Liga",
+    "Round": "Kolo",
+    "Home Team": "Domáci tím",
+    "Away Team": "Hosťujúci tím",
+    "Venue": "Miesto",
+    "Home": "Domáci",
+    "Draw": "Remíza",
+    "Away": "Hostia"
 }
 
 def get_translation(text):
