@@ -8,14 +8,6 @@ from .translations import get_translation as _  # Import translation function as
 
 def create_league_stats_tab():
     return dcc.Tab(label=_('League Statistics'), children=[
-        
-        # League Goals Comparison Chart
-        html.Div([
-            html.H2(_("Goals Comparison Across Leagues"),
-                   style={'text-align': 'center', 'margin': '20px 0'}),
-            dcc.Graph(id='league-goals-comparison')
-        ], style={'margin': '20px 0'}),
-        
         html.H1(_("League Statistics Analysis"),
                style={'text-align': 'center', 'margin': '20px'}),
         
@@ -75,6 +67,34 @@ def create_league_stats_tab():
                      'box-shadow': '0 4px 8px 0 rgba(0,0,0,0.2)',
                      'margin': '10px', 'border-radius': '5px'})
         ], style={'text-align': 'center', 'margin': '20px 0'}),
+        
+        # League Goals Comparison Chart
+        html.Div([
+            html.H2(_("Goals Comparison Across Leagues"),
+                   style={'text-align': 'center', 'margin': '20px 0'}),
+            
+            # Add category selector for the charts
+            html.Div([
+                html.Label(_('View'),
+                          style={'display': 'inline-block', 'margin-right': '10px', 'font-weight': 'bold'}),
+                dcc.RadioItems(
+                    id='league-category-selector',
+                    options=[
+                        {'label': _('All Categories'), 'value': 'all'},
+                        {'label': _('Top Leagues'), 'value': 'top'},
+                        {'label': _('Mid-Tier Leagues'), 'value': 'middle'},
+                        {'label': _('Bottom Leagues'), 'value': 'bottom'}
+                    ],
+                    value='all',
+                    inline=True,
+                    style={'display': 'inline-block'}
+                )
+            ], style={'text-align': 'center', 'margin': '10px 0'}),
+            
+            # Container for selected visualization
+            html.Div(id='league-goals-visualization-container')
+            
+        ], style={'margin': '20px 0'}),
         
         # Common Results Table
         html.Div([
