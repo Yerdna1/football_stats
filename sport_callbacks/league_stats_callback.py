@@ -41,10 +41,10 @@ def setup_league_stats_callbacks(app, api):
                 print(f"Error calculating league stats: {str(e)}")
                 return "N/A", "N/A", "N/A", []   
         
-         # League Goals Comparison Callback
+    # League Goals Comparison Callback - Improved with flag images
     @app.callback(
             Output('league-goals-comparison', 'figure'),
-            Input('stats-league-dropdown', 'value')  # We'll use this to trigger updates
+            Input('stats-league-dropdown', 'value')  # Used to trigger updates
         )
     def update_goals_comparison(_):
             try:
@@ -67,11 +67,14 @@ def setup_league_stats_callbacks(app, api):
                                 
                                 if total_matches > 0:
                                     avg_goals = round(total_goals / total_matches, 2)
+                                    # Store flag_url separately
                                     league_stats.append({
-                                        'league': f"{league_info['flag']} {league_info['name']}",
+                                        'league_name': league_info['name'],
+                                        'flag_url': league_info['flag'],
                                         'avg_goals': avg_goals,
                                         'total_goals': total_goals,
-                                        'matches': total_matches
+                                        'matches': total_matches,
+                                        'country': league_info['country']
                                     })
                         except Exception as e:
                             print(f"Error processing league {league_id}: {str(e)}")
@@ -86,39 +89,53 @@ def setup_league_stats_callbacks(app, api):
                 if df.empty:
                     raise ValueError("No data available")
                 
-                # Create bar chart
-                fig = px.bar(df, 
-                            x='league', 
-                            y='avg_goals',
-                            title='Average Goals per Match by League',
-                            labels={'league': 'League', 
-                                   'avg_goals': 'Average Goals per Match'},
-                            text=df['avg_goals'].round(2))  # Show values on bars
+                # Create bar chart with more visual appeal
+                fig = px.bar(
+                    df, 
+                    x='league_name',
+                    y='avg_goals',
+                    title='Average Goals per Match by League',
+                    labels={'league_name': 'League', 'avg_goals': 'Average Goals per Match'},
+                    text=df['avg_goals'].round(2),
+                    color='avg_goals',
+                    color_continuous_scale='Blues',
+                    height=600
+                )
                 
                 # Customize layout
                 fig.update_traces(
                     texttemplate='%{text}',
                     textposition='outside',
-                    marker_color='rgb(55, 83, 109)'
+                    marker_line_color='rgb(8,48,107)',
+                    marker_line_width=1.5,
+                    opacity=0.85
                 )
                 
+                # Improve layout
                 fig.update_layout(
                     xaxis_tickangle=45,
-                    margin=dict(t=50, l=50, r=50, b=120),  # Increased bottom margin
-                    plot_bgcolor='white',
+                    margin=dict(t=80, l=50, r=50, b=120),
+                    plot_bgcolor='rgba(240,240,240,0.2)',
                     paper_bgcolor='white',
                     font_family="Arial, sans-serif",
+                    font=dict(size=12),
+                    title_font=dict(size=18, color='rgb(8,48,107)'),
                     showlegend=False,
-                    height=600,  # Make chart taller to accommodate all leagues
-                    yaxis_title="Average Goals per Match",
-                    xaxis_title="League"
+                    coloraxis_showscale=False,
+                    xaxis=dict(
+                        tickmode='array',
+                        tickvals=list(range(len(df))),
+                        ticktext=['' for _ in range(len(df))]
+                    )
                 )
                 
+                # Add grid lines and improve axes
                 fig.update_xaxes(
-                    gridcolor='lightgrey',
+                    showgrid=False,
                     showline=True,
                     linewidth=1,
-                    linecolor='lightgrey'
+                    linecolor='lightgrey',
+                    title_font=dict(size=14)
                 )
                 
                 fig.update_yaxes(
@@ -126,7 +143,63 @@ def setup_league_stats_callbacks(app, api):
                     showline=True,
                     linewidth=1,
                     linecolor='lightgrey',
-                    range=[0, max(df['avg_goals']) * 1.1]  # Add 10% padding to y-axis
+                    range=[0, max(df['avg_goals']) * 1.1],
+                    title_font=dict(size=14)
+                )
+                
+                # Add flag images below the bars using annotations
+                for i, row in enumerate(df.to_dict('records')):
+                    # Add flag images
+                    fig.add_layout_image(
+                        dict(
+                            source=row['flag_url'],
+                            xref="x",
+                            yref="paper",
+                            x=i,
+                            y=-0.15,
+                            sizex=0.8,
+                            sizey=0.1,
+                            xanchor="center",
+                            yanchor="middle"
+                        )
+                    )
+                    
+                    # Add league name below flag
+                    fig.add_annotation(
+                        x=i,
+                        y=-0.23,
+                        text=row['league_name'],
+                        showarrow=False,
+                        xref="x",
+                        yref="paper",
+                        font=dict(
+                            family="Arial, sans-serif",
+                            size=10,
+                            color="black"
+                        ),
+                        align="center"
+                    )
+                    
+                    # Add country name for clarity
+                    fig.add_annotation(
+                        x=i,
+                        y=-0.28,
+                        text=row['country'],
+                        showarrow=False,
+                        xref="x",
+                        yref="paper",
+                        font=dict(
+                            family="Arial, sans-serif",
+                            size=8,
+                            color="gray"
+                        ),
+                        align="center"
+                    )
+                
+                # Add hover data with more information
+                fig.update_traces(
+                    hovertemplate='<b>%{x}</b><br>Average Goals: %{y:.2f}<br>Total Goals: %{customdata[0]}<br>Matches: %{customdata[1]}',
+                    customdata=df[['total_goals', 'matches']].values
                 )
                 
                 return fig
@@ -139,5 +212,4 @@ def setup_league_stats_callbacks(app, api):
                     yaxis_title="Average Goals per Match",
                     height=400
                 )
-                return empty_fig 
-        
+                return empty_fig
