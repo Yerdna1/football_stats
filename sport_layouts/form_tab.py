@@ -23,34 +23,36 @@ def preprocess_form_data(data):
     return data
 
 def create_form_analysis_tab():
-    return dcc.Tab(label='Form Analysis', children=[
-        html.H1("Team Form Analysis",
+    return dcc.Tab(label='Analýza formy', children=[
+        html.H1("Analýza formy tímov",
                 style={'text-align': 'center', 'margin': '20px'}),
 
         # League selector
         html.Div([
-            html.Label('Select League',
+          html.Label('Vybrať ligu',
                        style={'display': 'block', 'margin-bottom': '5px', 'text-align': 'center'}),
             dcc.Dropdown(
                 id='form-league-dropdown',
                 options=create_league_options(LEAGUE_NAMES),
                 value=39,
-                style={'width': '100%'}
+                style={'width': '100%', 'box-shadow': '0 2px 4px rgba(0,0,0,0.1)'}
+
             )
         ], style={'width': '80%', 'margin': '20px auto'}),
 
         # Form length selector
         html.Div([
-            html.Label('Form Analysis Length',
+            html.Label('Dĺžka analýzy formy',
+
                        style={'display': 'block', 'margin-bottom': '5px', 'text-align': 'center'}),
             dcc.RadioItems(
                 id='form-length-selector',
                 options=[
-                    {'label': 'Last 3 matches', 'value': 3},
-                    {'label': 'Last 5 matches', 'value': 5}
+                    {'label': 'Posledné 3 zápasy', 'value': 3},
+                    {'label': 'Posledných 5 zápasov', 'value': 5}
                 ],
                 value=3,
-                style={'textAlign': 'center', 'margin': '10px 0'},
+                style={'width': '80%', 'margin': '20px auto', 'backgroundColor': '#FFFFFF', 'padding': '15px', 'borderRadius': '8px'}),
                 inline=True
             )
         ], style={'width': '80%', 'margin': '20px auto'}),
@@ -58,21 +60,22 @@ def create_form_analysis_tab():
     
                 # Form Analysis Table
         html.Div([
-                    html.H2("Form vs Actual Performance Analysis",
+                            html.H2("Analýza formy vs aktuálny výkon",
+
                             style={'text-align': 'center', 'margin': '20px 0'}),
                     dash_table.DataTable(
                         id='form-analysis-table',
                         columns=[
-                            {'name': 'Team', 'id': 'team'},
-                            {'name': 'League', 'id': 'league'},
-                            {'name': 'Current Position', 'id': 'current_position'},
-                            {'name': 'Points', 'id': 'current_points'},
-                            {'name': 'PPG', 'id': 'current_ppg'},
-                            {'name': 'Recent Form', 'id': 'form', 'presentation': 'markdown'},
-                            {'name': 'Form Points', 'id': 'form_points'},
-                            {'name': 'Form PPG', 'id': 'form_ppg'},
-                            {'name': 'Performance Difference', 'id': 'performance_diff'},
-                            {'name': 'Injured Players', 'id': 'injured_players'}
+                            {'name': 'Tím', 'id': 'team'},
+                            {'name': 'Liga', 'id': 'league'},
+                            {'name': 'Aktuálna pozícia', 'id': 'current_position'},
+                            {'name': 'Body', 'id': 'current_points'},
+                            {'name': 'Priemer bodov', 'id': 'current_ppg'},
+                            {'name': 'Aktuálna forma', 'id': 'form', 'presentation': 'markdown'},
+                            {'name': 'Body z formy', 'id': 'form_points'},
+                            {'name': 'Priemer bodov z formy', 'id': 'form_ppg'},
+                            {'name': 'Rozdiel výkonu', 'id': 'performance_diff'},
+                            {'name': 'Zranení hráči', 'id': 'injured_players'}
                         ],
                         style_cell=table_cell_style,
                         style_header=table_header_style,
@@ -100,12 +103,13 @@ def create_form_analysis_tab():
                 
              # Squad Statistics section
         html.Div([
-            html.H2("Squad Statistics Analysis",
+            html.H2("Analýza štatistík hráčov",
+
                     style={'text-align': 'center', 'margin': '20px 0'}),
             
              # Add team selector
             html.Div([
-                html.Label('Select Team',
+                html.Label('Vybrať tím',
                           style={'display': 'block', 'margin-bottom': '5px', 'text-align': 'center'}),
                 dcc.Dropdown(
                     id='team-selector-dropdown',
@@ -118,8 +122,8 @@ def create_form_analysis_tab():
             dcc.RadioItems(
                 id='stats-type-selector',
                 options=[
-                    {'label': 'Basic Statistics', 'value': 'basic'},
-                    {'label': 'Advanced Statistics', 'value': 'advanced'}
+                  {'label': 'Základné štatistiky', 'value': 'basic'},
+                    {'label': 'Pokročilé štatistiky', 'value': 'advanced'}
                 ],
                 value='basic',
                 style={'textAlign': 'center', 'margin': '10px 0'},
@@ -133,16 +137,16 @@ def create_form_analysis_tab():
                     dash_table.DataTable(
                         id='player-stats-table',
                         columns=[
-                            {'name': 'Player', 'id': 'name'},
-                            {'name': 'Position', 'id': 'position'},
-                            {'name': 'Age', 'id': 'age'},
-                            {'name': 'Apps', 'id': 'appearances'},
-                            {'name': 'Minutes', 'id': 'minutes'},
-                            {'name': 'Goals', 'id': 'goals'},
-                            {'name': 'Assists', 'id': 'assists'},
-                            {'name': 'Rating', 'id': 'rating'},
-                            {'name': 'Yellow', 'id': 'yellow_cards'},
-                            {'name': 'Red', 'id': 'red_cards'}
+                             {'name': 'Hráč', 'id': 'name'},
+                            {'name': 'Pozícia', 'id': 'position'},
+                            {'name': 'Vek', 'id': 'age'},
+                            {'name': 'Zápasy', 'id': 'appearances'},
+                            {'name': 'Minúty', 'id': 'minutes'},
+                            {'name': 'Góly', 'id': 'goals'},
+                            {'name': 'Asistencie', 'id': 'assists'},
+                            {'name': 'Hodnotenie', 'id': 'rating'},
+                            {'name': 'Žlté karty', 'id': 'yellow_cards'},
+                            {'name': 'Červené karty', 'id': 'red_cards'}
                         ],
                         data=[],
                         style_data={
@@ -179,16 +183,17 @@ def create_form_analysis_tab():
                     dash_table.DataTable(
                         id='advanced-stats-table',
                         columns=[
-                            {'name': 'Player', 'id': 'name'},
-                            {'name': 'Position', 'id': 'position'},
-                            {'name': 'Shots Total', 'id': 'shots_total'},
-                            {'name': 'Shots On', 'id': 'shots_on'},
-                            {'name': 'Pass %', 'id': 'passes_accuracy'},
-                            {'name': 'Key Passes', 'id': 'passes_key'},
-                            {'name': 'Tackles', 'id': 'tackles'},
-                            {'name': 'Intercept.', 'id': 'interceptions'},
-                            {'name': 'Dribbles (S/A)', 'id': 'dribbles_success'},
-                            {'name': 'Fouls Drawn', 'id': 'fouls_drawn'}
+                             {'name': 'Hráč', 'id': 'name'},
+                            {'name': 'Pozícia', 'id': 'position'},
+                            {'name': 'Strely celkom', 'id': 'shots_total'},
+                            {'name': 'Strely na bránu', 'id': 'shots_on'},
+                            {'name': 'Presnosť prihrávok %', 'id': 'passes_accuracy'},
+                            {'name': 'Kľúčové prihrávky', 'id': 'passes_key'},
+                            {'name': 'Sklzy', 'id': 'tackles'},
+                            {'name': 'Zachytenia', 'id': 'interceptions'},
+                            {'name': 'Dribling (Ú/P)', 'id': 'dribbles_success'},
+                            {'name': 'Vynútené fauly', 'id': 'fouls_drawn'}
+
                         ],
                         data=[],
                         style_data={
@@ -222,17 +227,18 @@ def create_form_analysis_tab():
 
                 # Upcoming Fixtures Table
                 html.Div([
-                    html.H2("Upcoming Fixtures for Top Form-Changing Teams",
+                   html.H2("Nadchádzajúce zápasy pre tímy s najväčšími zmenami formy",
                             style={'text-align': 'center', 'margin': '30px 0 20px 0'}),
                     dash_table.DataTable(
                         id='upcoming-fixtures-table',
                         columns=[
-                            {'name': 'Team', 'id': 'team'},
-                            {'name': 'Performance Diff', 'id': 'performance_diff'},
-                            {'name': 'Next Opponent', 'id': 'next_opponent'},
-                            {'name': 'Date', 'id': 'date'},
-                            {'name': 'Time', 'id': 'time'},
-                            {'name': 'Venue', 'id': 'venue'}
+                            {'name': 'Tím', 'id': 'team'},
+                            {'name': 'Rozdiel výkonu', 'id': 'performance_diff'},
+                            {'name': 'Nasledujúci súper', 'id': 'next_opponent'},
+                            {'name': 'Dátum', 'id': 'date'},
+                            {'name': 'Čas', 'id': 'time'},
+                            {'name': 'Miesto', 'id': 'venue'}
+
                         ],
                         style_cell=table_cell_style,
                         style_header=table_header_style,
