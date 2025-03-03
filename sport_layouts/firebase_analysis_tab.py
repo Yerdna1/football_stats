@@ -3,6 +3,7 @@ from dash import html, dcc, dash_table
 
 from .utils import create_league_options
 from .styles import table_cell_style, table_header_style, table_style
+from .translations import get_translation as _  # Import translation function as _
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -20,34 +21,34 @@ def create_firebase_analysis_tab():
     logger.debug("Starting create_firebase_analysis_tab function")
     try:
         tab = dcc.Tab(
-            label='Firebase Analysis',
+            label=_('Firebase Analysis'),
             value='firebase-analysis-tab',
             children=[
                 # Firebase Analysis Section
                 html.Div([
                     # Analyze Data Button
                     html.Button(
-                        'Analyze Data',
+                        _('Analyze Data'),
                         id='analyze-data-button',
                         className='button-primary mb-4'
                     ),
                     
                     # Data Quality Section
                     html.Div([
-                        html.H2("Data Quality Analysis", className='text-2xl font-bold mb-4'),
+                        html.H2(_("Data Quality Analysis"), className='text-2xl font-bold mb-4'),
                         html.Div(id='data-quality-container')
                     ], className='mb-8'),
 
                     # Player Statistics Section
                     html.Div([
-                        html.H2("Player Statistics", className='text-2xl font-bold mb-4'),
+                        html.H2(_("Player Statistics"), className='text-2xl font-bold mb-4'),
                         html.Div(id='player-stats-container'),
                         html.Div(id='firebase-error-container'),
                     ], className='mb-8'),
 
                     # Team Statistics Section
                     html.Div([
-                        html.H2("Team Statistics", className='text-2xl font-bold mb-4'),
+                        html.H2(_("Team Statistics"), className='text-2xl font-bold mb-4'),
                         dash_table.DataTable(
                             id='team-statistics-table',
                             columns=[],  # Columns will be populated dynamically
@@ -64,7 +65,7 @@ def create_firebase_analysis_tab():
 
                     # Team Quality Report Section
                     html.Div([
-                        html.H2("Team Quality Report", className='text-2xl font-bold mb-4'),
+                        html.H2(_("Team Quality Report"), className='text-2xl font-bold mb-4'),
                         dash_table.DataTable(
                             id='team-quality-report-table',
                             columns=[],  # Columns will be populated dynamically
@@ -81,7 +82,7 @@ def create_firebase_analysis_tab():
 
                     # Team Report Section
                     html.Div([
-                        html.H2("Team Report", className='text-2xl font-bold mb-4'),
+                        html.H2(_("Team Report"), className='text-2xl font-bold mb-4'),
                         dash_table.DataTable(
                             id='team-report-table',
                             columns=[],  # Columns will be populated dynamically
@@ -98,9 +99,9 @@ def create_firebase_analysis_tab():
 
 
                     
-                    # Team Statistics Section
+                    # Team Statistics Section (Note: This appears to be duplicate)
                     html.Div([
-                        html.H2("Team Statistics", className='text-2xl font-bold mb-4'),
+                        html.H2(_("Team Statistics"), className='text-2xl font-bold mb-4'),
                         html.Div(id='team-stats-container')
                     ], className='mb-8')
                 ], className='p-4'),
@@ -111,4 +112,4 @@ def create_firebase_analysis_tab():
         return tab
     except Exception as e:
         logger.error(f"Error creating firebase analysis tab: {e}", exc_info=True)
-        return html.Div("Error creating firebase tab")
+        return html.Div(_("Error creating firebase tab"))
