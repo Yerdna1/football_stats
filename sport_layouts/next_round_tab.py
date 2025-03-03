@@ -4,10 +4,11 @@ from league_names import LEAGUE_NAMES
 
 from .utils import create_league_options
 from .styles import table_cell_style, table_header_style, table_style
+from .translations import get_translation as _  # Import translation function as _
 
 def create_next_round_tab():
-    return dcc.Tab(label='Next Round', children=[
-        html.H1("Next Round Fixtures and Analysis",
+    return dcc.Tab(label=_('Next Round'), children=[
+        html.H1(_("Next Round Fixtures and Analysis"),
                style={'text-align': 'center', 'margin': '20px'}),
         
         # League selection
@@ -22,21 +23,21 @@ def create_next_round_tab():
         
         # Fixtures section
         html.Div([
-            html.H2("Upcoming Fixtures",
+            html.H2(_("Upcoming Fixtures"),
                    style={'text-align': 'center', 'margin': '20px'}),
             dash_table.DataTable(
                 id='next-fixtures-table',
                 columns=[
-                    {'name': 'Date', 'id': 'date'},
-                    {'name': 'Time', 'id': 'time'},
-                    {'name': 'League', 'id': 'league'},
-                    {'name': 'Round', 'id': 'round'},
-                    {'name': 'Home Team', 'id': 'home_team'},
-                    {'name': 'Away Team', 'id': 'away_team'},
-                    {'name': 'Venue', 'id': 'venue'},
-                    {'name': 'Home', 'id': 'home_odds'},
-                    {'name': 'Draw', 'id': 'draw_odds'},
-                    {'name': 'Away', 'id': 'away_odds'}
+                    {'name': _('Date'), 'id': 'date'},
+                    {'name': _('Time'), 'id': 'time'},
+                    {'name': _('League'), 'id': 'league'},
+                    {'name': _('Round'), 'id': 'round'},
+                    {'name': _('Home Team'), 'id': 'home_team'},
+                    {'name': _('Away Team'), 'id': 'away_team'},
+                    {'name': _('Venue'), 'id': 'venue'},
+                    {'name': _('Home'), 'id': 'home_odds'},
+                    {'name': _('Draw'), 'id': 'draw_odds'},
+                    {'name': _('Away'), 'id': 'away_odds'}
                 ],
                 style_data_conditional=[
                     {
@@ -65,13 +66,13 @@ def create_next_round_tab():
         
         # Team and player statistics
         html.Div([
-            html.H2("Match Analysis",
+            html.H2(_("Match Analysis"),
                    style={'text-align': 'center', 'margin': '20px'}),
             
             # Selected match statistics
             dcc.Dropdown(
                 id='fixture-select-dropdown',
-                placeholder='Select a fixture to analyze',
+                placeholder=_('Select a fixture to analyze'),
                 style={'width': '50%', 'margin': '20px auto'}
             ),
             
@@ -112,7 +113,7 @@ def create_next_round_tab():
             
             # Key points and analysis
             html.Div([
-                html.H3("Match Analysis", style={'text-align': 'center'}),
+                html.H3(_("Match Analysis"), style={'text-align': 'center'}),
                 html.Div(id='match-analysis',
                         style={'width': '80%', 'margin': '0 auto'})
             ])
