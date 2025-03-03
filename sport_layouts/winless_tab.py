@@ -1,24 +1,22 @@
 from dash import html, dcc, dash_table
-
 from league_names import LEAGUE_NAMES
-
 from .utils import create_league_options
 from .styles import table_cell_style, table_header_style, table_style, table_conditional_style
 
 def create_last_matches_table():
     return html.Div([
-        html.H2("Last Results for Top 5 Winless Teams",
+        html.H2("Posledné výsledky pre 5 najhorších tímov bez výhry",
                style={'text-align': 'center',
                      'margin': '20px 0',
                      'font-family': 'Arial, sans-serif'}),
         dash_table.DataTable(
             id='last-matches-table',
             columns=[
-                {'name': 'Team', 'id': 'team'},
-                {'name': 'Winless Streak', 'id': 'streak'},
-                {'name': 'Last Match Result', 'id': 'result'},
-                {'name': 'Score', 'id': 'score'},
-                {'name': 'Date', 'id': 'date'}
+                {'name': 'Tím', 'id': 'team'},
+                {'name': 'Séria bez výhry', 'id': 'streak'},
+                {'name': 'Výsledok posledného zápasu', 'id': 'result'},
+                {'name': 'Skóre', 'id': 'score'},
+                {'name': 'Dátum', 'id': 'date'}
             ],
             style_cell=table_cell_style,
             style_header=table_header_style,
@@ -28,8 +26,8 @@ def create_last_matches_table():
     ])
     
 def create_winless_streaks_tab():
-    return dcc.Tab(label='Winless Streaks', children=[
-        html.H1("Winless Streaks in Top 5 European Leagues", 
+    return dcc.Tab(label='Série bez výhry', children=[
+        html.H1("Série bez výhry v 5 najlepších európskych ligách", 
                style={'text-align': 'center', 
                      'margin-bottom': '30px',
                      'margin-top': '20px',
@@ -45,7 +43,7 @@ def create_winless_streaks_tab():
         html.Div([
             dcc.Checklist(
                 id='current-streak-filter',
-                options=[{'label': 'Show Only Current Running Streaks', 
+                options=[{'label': 'Zobraziť iba aktuálne prebiehajúce série', 
                          'value': 'current'}],
                 value=[],
                 style={'textAlign': 'center', 'margin': '10px 0'}
