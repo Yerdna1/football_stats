@@ -1,10 +1,8 @@
-dash
-plotly
-pandas
-gunicorn
-requests  # Assuming FootballAPI relies on requests
-python-redis
-python-dotenv
-firebase_admin
-openpyxl
-xlrd
+customtkinter>=5.2.0
+matplotlib>=3.7.0
+numpy>=1.24.0
+pandas>=2.0.0
+Pillow>=10.0.0
+requests>=2.28.0
+tkinter
+sqlite3

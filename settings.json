@@ -1,0 +1,14 @@
+{
+    "appearance_mode": "System",
+    "color_theme": "blue",
+    "form_length": 5,
+    "threshold": 0.40000000000000013,
+    "auto_refresh": true,
+    "refresh_interval": 30,
+    "leagues": [
+        -1
+    ],
+    "prediction_threshold_level1": 0.75,
+    "prediction_threshold_level2": 1.05,
+    "font_size": 30
+}
